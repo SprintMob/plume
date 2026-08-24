@@ -2,14 +2,9 @@ import Foundation
 import WhisperKit
 
 actor WhisperKitTranscriber: Transcriber {
-    /// Where model weights live. WhisperKit defaults to `Documents`, which iCloud
-    /// replicates and evicts to dataless stubs — CoreML's mmap of an evicted
-    /// weight file then blocks forever and the daemon never finishes loading.
-    private static let modelStore = URL.applicationSupportDirectory.appending(path: "parrot/huggingface")
-
     /// Earlier versions downloaded into WhisperKit's `Documents` default. Say so
     /// once rather than silently re-downloading gigabytes behind the user's back.
-    private static let legacyModelStore = URL.documentsDirectory.appending(path: "huggingface")
+    static let legacyModelStore = URL.documentsDirectory.appending(path: "huggingface")
 
     let modelID: String
     private let model: TranscriptionModel
@@ -23,19 +18,30 @@ actor WhisperKitTranscriber: Transcriber {
     /// Loads the model into memory; downloads first if not already on disk.
     /// Call once at startup so the first hotkey press isn't blocked on model
     /// download/load.
-    func warmUp() async throws {
+    func warmUp(onProgress: (@Sendable (Double) -> Void)? = nil) async throws {
         if pipeline != nil { return }
-        guard let whisperKitID = model.whisperKitID else {
+        guard let engineID = model.engineID else {
             throw TranscriberError.missingEngineID
         }
         Self.noteLegacyStore()
         FileHandle.standardError.write(Data("loading \(model.id)...\n".utf8))
+        // Downloading separately from loading is what makes progress visible:
+        // WhisperKit reports it on the static download and not on init.
+        let folder = try await WhisperKit.download(
+            variant: engineID,
+            downloadBase: ModelWeights.whisperKitBase,
+            progressCallback: { progress in onProgress?(progress.fractionCompleted) })
+        // `downloadBase` is not redundant beside an explicit `modelFolder`: the
+        // tokenizer is fetched separately and lands under the base. Drop it and
+        // tokenizers go back to `Documents`, which is the eviction this avoids.
         let config = WhisperKitConfig(
-            model: whisperKitID,
-            downloadBase: Self.modelStore,
+            model: engineID,
+            downloadBase: ModelWeights.whisperKitBase,
+            modelFolder: folder.path(percentEncoded: false),
             verbose: false,
             prewarm: true,
-            load: true
+            load: true,
+            download: false
         )
         pipeline = try await WhisperKit(config)
         FileHandle.standardError.write(Data("✓ \(model.id) ready\n".utf8))
@@ -47,8 +53,12 @@ actor WhisperKitTranscriber: Transcriber {
         let path = legacyModelStore.path(percentEncoded: false)
         guard FileManager.default.fileExists(atPath: path) else { return }
         FileHandle.standardError.write(Data(
-            "models now live in \(modelStore.path(percentEncoded: false)) — \(path) is unused, delete it to reclaim space\n".utf8
+            "models now live in \(ModelWeights.whisperKitBase.path(percentEncoded: false)) — \(path) is unused, delete it to reclaim space\n".utf8
         ))
+    }
+
+    func unload() async {
+        pipeline = nil
     }
 
     func transcribe(_ audio: [Float]) async throws -> String {
