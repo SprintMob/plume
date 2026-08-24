@@ -65,9 +65,41 @@ actor WhisperKitTranscriber: Transcriber {
         if pipeline == nil { try await warmUp() }
         guard let pipeline else { throw TranscriberError.notLoaded }
 
-        let results = try await pipeline.transcribe(audioArray: audio)
+        // The language is resolved first and then pinned. Left to decide for
+        // itself mid-decode, Whisper translates rather than transcribes —
+        // Portuguese speech comes back as English sentences — and an example in
+        // the wrong language makes that worse rather than better.
+        //
+        // Detection is the last resort: it costs a second encoder pass, it is
+        // unsupported on single-language models, and both of the cheaper
+        // answers are exact rather than guesses.
+        let examples = DictationExamples()
+        let language: String?
+        if model.languages.count == 1, model.languages[0] != "multi" {
+            language = model.languages[0]
+        } else if let sole = examples.soleLanguage {
+            language = sole
+        } else {
+            language = try? await pipeline.detectLangauge(audioArray: audio).language
+        }
+        let results = try await pipeline.transcribe(
+            audioArray: audio,
+            decodeOptions: DecodingOptions(language: language,
+                                           promptTokens: language.flatMap { promptTokens(examples, $0) }))
         let raw = results.map(\.text).joined(separator: " ")
         return Self.sanitize(raw)
+    }
+
+    /// Read per dictation so editing the file takes effect on the next phrase.
+    /// Special tokens are dropped: the decoder builds its own control sequence
+    /// around this text, and a stray one there desynchronises it.
+    private func promptTokens(_ examples: DictationExamples, _ language: String) -> [Int]? {
+        guard let example = examples.example(for: language),
+              let tokenizer = pipeline?.tokenizer
+        else { return nil }
+        let tokens = tokenizer.encode(text: " " + example)
+            .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        return tokens.isEmpty ? nil : tokens
     }
 
     /// Strip Whisper's non-speech bracket tokens ([BLANK_AUDIO], [MUSIC],
