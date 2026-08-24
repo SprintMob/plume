@@ -10,6 +10,51 @@ final class HotkeyMonitor {
     enum Event { case pressed, released }
     enum HotkeyError: Error { case tapCreateFailed }
 
+    /// A modifier key usable as push-to-talk.
+    ///
+    /// `mask` is the flag the modifier raises; `keycode` disambiguates the
+    /// left and right instances of a modifier, which share a single flag.
+    /// Fn uses no keycode filter — Apple keyboards raise `.maskSecondaryFn`
+    /// on their own, and third-party keyboards never send Fn to the host at
+    /// all (it is a firmware-local modifier), which is why they need one of
+    /// the other options here.
+    enum Hotkey: String, CaseIterable {
+        case fn
+        case rightOption = "right-option"
+        case leftOption = "left-option"
+        case rightCommand = "right-command"
+        case leftCommand = "left-command"
+        case rightControl = "right-control"
+        case leftControl = "left-control"
+        case rightShift = "right-shift"
+        case leftShift = "left-shift"
+
+        var mask: CGEventFlags {
+            switch self {
+            case .fn: return .maskSecondaryFn
+            case .rightOption, .leftOption: return .maskAlternate
+            case .rightCommand, .leftCommand: return .maskCommand
+            case .rightControl, .leftControl: return .maskControl
+            case .rightShift, .leftShift: return .maskShift
+            }
+        }
+
+        /// Virtual keycode of the physical key, where it matters.
+        var keycode: Int64? {
+            switch self {
+            case .fn: return nil
+            case .rightOption: return 61
+            case .leftOption: return 58
+            case .rightCommand: return 54
+            case .leftCommand: return 55
+            case .rightControl: return 62
+            case .leftControl: return 59
+            case .rightShift: return 60
+            case .leftShift: return 56
+            }
+        }
+    }
+
     /// Mask of the modifier we treat as the hotkey. Fn = `.maskSecondaryFn`.
     private let mask: CGEventFlags
     /// When set, only flagsChanged events with this keycode are considered,
@@ -25,6 +70,11 @@ final class HotkeyMonitor {
         self.mask = mask
         self.keycode = keycode
         self.debug = debug
+    }
+
+    /// Resolve a named modifier to the flag and keycode it is watched by.
+    convenience init(hotkey: Hotkey, debug: Bool = false) {
+        self.init(mask: hotkey.mask, keycode: hotkey.keycode, debug: debug)
     }
 
     func start(onEvent: @escaping (Event) -> Void) throws {
@@ -109,6 +159,8 @@ final class HotkeyMonitor {
                 ))
         }
         guard type == .flagsChanged else { return }
+        // Left/right instances of a modifier share one flag, so filter on the
+        // physical key before reading the flag.
         if let keycode, event.getIntegerValueField(.keyboardEventKeycode) != keycode { return }
         let pressed = event.flags.contains(mask)
         guard pressed != isPressed else { return }

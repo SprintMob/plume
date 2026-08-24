@@ -16,15 +16,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Set after construction: switching needs the daemon, and the daemon needs
     /// the controller it reports back to.
     var onModel: ((TranscriptionModel) -> Void)?
+    /// Names the configured hotkey, so the idle line is not a lie under
+    /// `--hotkey right-option`.
+    private let idleTitle: String
 
-    init(model: TranscriptionModel) {
+    init(model: TranscriptionModel, hotkeyLabel: String) {
         self.model = model
+        self.idleTitle = "idle · hold \(hotkeyLabel) to dictate"
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        stateLabel = NSMenuItem(title: "idle · hold fn to dictate", action: nil, keyEquivalent: "")
+        stateLabel = NSMenuItem(title: idleTitle, action: nil, keyEquivalent: "")
         stateLabel.isEnabled = false
         menu.addItem(stateLabel)
 
@@ -130,7 +134,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func setRecording(_ recording: Bool) {
-        stateLabel.title = recording ? "● recording" : "idle · hold fn to dictate"
+        stateLabel.title = recording ? "● recording" : idleTitle
     }
 
     func setTranscribing() {
