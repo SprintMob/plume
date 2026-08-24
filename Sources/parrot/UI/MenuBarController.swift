@@ -19,10 +19,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Names the configured hotkey, so the idle line is not a lie under
     /// `--hotkey right-option`.
     private let idleTitle: String
+    private let hotkeyLabel: String
 
     init(model: TranscriptionModel, hotkeyLabel: String) {
         self.model = model
-        self.idleTitle = "idle · hold \(hotkeyLabel) to dictate"
+        self.hotkeyLabel = hotkeyLabel
+        self.idleTitle = "idle · hold \(hotkeyLabel) or double-tap to lock"
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
@@ -139,6 +141,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func setTranscribing() {
         stateLabel.title = "transcribing…"
+    }
+
+    func setLockedRecording() {
+        stateLabel.title = "🔒 recording · tap \(hotkeyLabel) to stop"
     }
 
     private func configureButton(recording: Bool) {

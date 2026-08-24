@@ -7,7 +7,7 @@ import Foundation
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
 final class HotkeyMonitor {
-    enum Event { case pressed, released }
+    enum Event { case pressed, released, interrupted }
     enum HotkeyError: Error { case tapCreateFailed }
 
     /// A modifier key usable as push-to-talk.
@@ -143,6 +143,12 @@ final class HotkeyMonitor {
     fileprivate func reEnable() {
         guard let tap else { return }
         CGEvent.tapEnable(tap: tap, enable: true)
+        // The disable swallowed whatever edges happened while it was down, so
+        // the release that ends an in-flight recording may never arrive. Reset
+        // the edge state and tell the caller, rather than staying stuck
+        // believing the key is still held.
+        isPressed = false
+        onEvent?(.interrupted)
         FileHandle.standardError.write(Data(
             "event tap was disabled by the system — re-enabled\n".utf8
         ))

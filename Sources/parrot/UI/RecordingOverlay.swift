@@ -8,6 +8,7 @@ final class RecordingOverlay {
     enum State: Equatable {
         case hidden
         case recording
+        case locked
         case transcribing
     }
 
@@ -63,7 +64,7 @@ final class RecordingOverlay {
     private func ensureWindow() {
         if window != nil { return }
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 96, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 112, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -155,6 +156,15 @@ private struct OverlayPill: View {
         case .hidden, .recording:
             Waveform(levels: model.levels)
                 .frame(width: 54, height: 22)
+        case .locked:
+            HStack(spacing: 7) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color(red: 181/255.0, green: 209/255.0, blue: 255/255.0))
+                Waveform(levels: model.levels)
+                    .frame(width: 54, height: 22)
+            }
+            .frame(width: 72, height: 22)
         case .transcribing:
             ProgressView()
                 .controlSize(.small)

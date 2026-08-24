@@ -23,5 +23,9 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),
+        .testTarget(
+            name: "parrotTests",
+            dependencies: ["parrot"]
+        ),
     ]
 )
