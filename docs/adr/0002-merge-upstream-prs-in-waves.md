@@ -16,8 +16,9 @@ https://claude.ai/code/artifact/72aebb8a-a617-4aa1-a851-b27e48be1823
 
 ## Consequences
 
-- Two arbitrations are still open and gate the plan: whether #26 (4,256 lines,
+- Two arbitrations were open and gated the plan: whether #26 (4,256 lines,
   conflicting with nine PRs) becomes the fork's base or is closed, and which of
-  #4/#7/#10/#18 is the base for the hotkey cluster.
+  #4/#7/#10/#18 is the base for the hotkey cluster. The second is settled — see
+  [ADR-0003](./0003-hotkey-cluster-base.md). The first is still open.
 - #26 must be settled immediately after wave 1. Every merge landed before that
   decision makes it more expensive, and it is the only irreversible one.
