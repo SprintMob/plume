@@ -21,7 +21,7 @@ The installer drops the binary in `/usr/local/bin/parrot`. Builds are unsigned f
 3. **Hold the `fn` key, speak, release.** A small pill appears at the bottom of the screen while the mic is hot.
 4. **For hands-free dictation, double-tap `fn`.** The recording stays active and a lock appears beside the waveform.
 5. **Tap `fn` once to stop a locked dictation.** Parrot restores audio, transcribes, and types at the cursor.
-6. **The transcript types itself in at the cursor** after recording stops. Usually within 200-300ms.
+6. **The transcript types itself in at the cursor** after recording stops. Usually within 200-300ms. If no editable text field has the focus, a popover holds the transcript so you can copy it instead of losing it.
 
 That's it. There is no record button, no stop button, no "send" — `fn` is the whole interface.
 

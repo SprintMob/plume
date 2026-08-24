@@ -131,6 +131,7 @@ struct Run: ParsableCommand {
         let menuBar = MainActor.assumeIsolated {
             MenuBarController(model: chosenModel, hotkeyLabel: hotkey.rawValue)
         }
+        let fallbackPopover = MainActor.assumeIsolated { TranscriptFallbackPopover() }
         MainActor.assumeIsolated {
             menuBar.onModel = { [weak menuBar] next in
                 Task {
@@ -158,6 +159,7 @@ struct Run: ParsableCommand {
                 try capture.start()
                 FileHandle.standardError.write(Data("● recording\n".utf8))
                 MainActor.assumeIsolated {
+                    fallbackPopover.hide()
                     overlay?.show(.recording)
                     menuBar.setRecording(true)
                 }
@@ -207,9 +209,14 @@ struct Run: ParsableCommand {
                         : String(format: "→ %.2fs · %ld chars\n", elapsed, text.count)
                     FileHandle.standardError.write(Data(line.utf8))
                     await MainActor.run {
-                        TextInjector.inject(text, mode: injectMode)
                         overlay?.hide()
                         menuBar.setRecording(false)
+                        guard !text.isEmpty else { return }
+                        if FocusedTextTarget.isEditable {
+                            TextInjector.inject(text, mode: injectMode)
+                        } else {
+                            fallbackPopover.show(text)
+                        }
                     }
                 } catch {
                     FileHandle.standardError.write(Data("transcription failed: \(error)\n".utf8))
