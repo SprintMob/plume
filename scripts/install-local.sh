@@ -59,4 +59,15 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist"
 
 echo "installed: $TARGET"
 echo "requirement: $requirement"
-echo "log: /tmp/parrot.err.log"
+
+# The daemon's output goes to /dev/null unless the plist was generated with
+# `parrot install --launch-at-login --log-file`, which points it at
+# ~/Library/Logs/parrot.log (0600). Read the plist rather than guessing: this
+# script reinstalls the binary, it does not regenerate the agent.
+log=$(/usr/libexec/PlistBuddy -c "Print :StandardErrorPath" \
+    "$HOME/Library/LaunchAgents/$LABEL.plist" 2>/dev/null || echo "unknown")
+if [ "$log" = "/dev/null" ]; then
+  echo "log: discarded — reinstall the agent with 'parrot install --launch-at-login --log-file' to keep it"
+else
+  echo "log: $log"
+fi
