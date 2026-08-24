@@ -37,6 +37,9 @@ struct Run: ParsableCommand {
     @Option(name: .long, help: "Model id to use. Defaults to the recommended model.")
     var model: String?
 
+    @Option(name: .long, help: "Push-to-talk key: fn (default) or right-option.")
+    var hotkey: String = "fn"
+
     /// Both purge sites report the same way; the number is the only reason the
     /// user would care that a purge happened at all.
     private func reclaim(_ bytes: Int64) {
@@ -94,7 +97,16 @@ struct Run: ParsableCommand {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let monitor = HotkeyMonitor(debug: debugHotkey)
+        let monitor: HotkeyMonitor
+        switch hotkey {
+        case "fn":
+            monitor = HotkeyMonitor(debug: debugHotkey)
+        case "right-option":
+            monitor = HotkeyMonitor(mask: .maskAlternate, keycode: 61, debug: debugHotkey)
+        default:
+            FileHandle.standardError.write(Data("unknown hotkey: \(hotkey) (use fn or right-option)\n".utf8))
+            throw ExitCode(1)
+        }
         let capture = AudioCapture()
         let dumpWav = self.dumpWav
         let echoTranscripts = self.echoTranscripts
@@ -206,7 +218,7 @@ struct Run: ParsableCommand {
         sigint.resume()
         signal(SIGINT, SIG_IGN)
 
-        FileHandle.standardError.write(Data("listening on fn hold · model: \(chosenModel.id) · ^C to quit\n".utf8))
+        FileHandle.standardError.write(Data("listening on \(hotkey) hold · model: \(chosenModel.id) · ^C to quit\n".utf8))
         app.run()
     }
 }
