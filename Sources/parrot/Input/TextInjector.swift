@@ -40,8 +40,9 @@ enum TextInjector {
         down?.keyboardSetUnicodeString(stringLength: length, unicodeString: &chunk)
         down?.post(tap: .cgAnnotatedSessionEventTap)
 
+        // The keyUp deliberately carries no unicode payload: attaching the same
+        // string to both events makes the focused app insert the text twice.
         let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-        up?.keyboardSetUnicodeString(stringLength: length, unicodeString: &chunk)
         up?.post(tap: .cgAnnotatedSessionEventTap)
     }
 }
