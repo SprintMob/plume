@@ -120,6 +120,7 @@ struct Run: ParsableCommand {
         app.setActivationPolicy(.accessory)
 
         let monitor = HotkeyMonitor(hotkey: hotkey, debug: debugHotkey)
+        let devices = InputDeviceStore()
         let capture = AudioCapture()
         let outputMute = muteOutput ? OutputMuteController() : nil
         let dumpWav = self.dumpWav
@@ -129,7 +130,7 @@ struct Run: ParsableCommand {
             capture.onLevel = { level in overlay.pushLevel(level) }
         }
         let menuBar = MainActor.assumeIsolated {
-            MenuBarController(model: chosenModel, hotkeyLabel: hotkey.rawValue)
+            MenuBarController(model: chosenModel, hotkeyLabel: hotkey.rawValue, devices: devices)
         }
         let fallbackPopover = MainActor.assumeIsolated { TranscriptFallbackPopover() }
         MainActor.assumeIsolated {
@@ -156,7 +157,7 @@ struct Run: ParsableCommand {
         func beginRecording() -> Bool {
             outputMute?.mute()
             do {
-                try capture.start()
+                try capture.start(device: devices.resolved()?.id)
                 FileHandle.standardError.write(Data("● recording\n".utf8))
                 MainActor.assumeIsolated {
                     fallbackPopover.hide()

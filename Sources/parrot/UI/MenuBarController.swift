@@ -9,6 +9,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let modelItem: NSMenuItem
+    private let inputItem: NSMenuItem
     private var model: TranscriptionModel
     /// The model being switched to. Set on click so the menu answers the click
     /// rather than the download, which can take minutes.
@@ -20,11 +21,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// `--hotkey right-option`.
     private let idleTitle: String
     private let hotkeyLabel: String
+    private let devices: InputDeviceStore
 
-    init(model: TranscriptionModel, hotkeyLabel: String) {
+    init(model: TranscriptionModel, hotkeyLabel: String, devices: InputDeviceStore) {
         self.model = model
         self.hotkeyLabel = hotkeyLabel
         self.idleTitle = "idle · hold \(hotkeyLabel) or double-tap to lock"
+        self.devices = devices
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
@@ -43,6 +46,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         modelMenu.autoenablesItems = false
         modelItem.submenu = modelMenu
         menu.addItem(modelItem)
+
+        inputItem = NSMenuItem(title: "Input", action: nil, keyEquivalent: "")
+        let inputMenu = NSMenu()
+        inputMenu.autoenablesItems = false
+        inputItem.submenu = inputMenu
+        menu.addItem(inputItem)
 
         let example = NSMenuItem(
             title: "Edit dictation examples…",
@@ -63,8 +72,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         quit.target = self
         menu.addItem(quit)
 
-        // Rebuild the model list on open so a switch in flight is reflected
-        // without the menu holding its own copy of the state.
+        // Rebuild the model and device lists on open: a switch in flight and a
+        // newly plugged-in mic are both reflected without the menu holding its
+        // own copy of the state or watching CoreAudio for device changes.
         menu.delegate = self
 
         statusItem.menu = menu
@@ -83,6 +93,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        rebuildInputMenu()
         guard let modelSubmenu = modelItem.submenu else { return }
         modelSubmenu.removeAllItems()
         for candidate in ModelRegistry.shared {
@@ -133,6 +144,32 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func setModelFailed(_ attempted: TranscriptionModel) {
         pending = nil
         modelLabel.title = "model: \(model.id) · \(attempted.id) failed"
+    }
+
+    private func rebuildInputMenu() {
+        guard let submenu = inputItem.submenu else { return }
+        submenu.removeAllItems()
+
+        let selected = devices.selectedUID
+        submenu.addItem(inputChoice(title: "Same as System", uid: nil, checked: selected == nil))
+        submenu.addItem(.separator())
+        for device in devices.available() {
+            submenu.addItem(inputChoice(title: device.name, uid: device.uid, checked: device.uid == selected))
+        }
+    }
+
+    private func inputChoice(title: String, uid: String?, checked: Bool) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(inputSelected), keyEquivalent: "")
+        item.target = self
+        item.representedObject = uid
+        item.state = checked ? .on : .off
+        return item
+    }
+
+    /// Only writes the preference — the next recording resolves it, so there is
+    /// nothing to notify.
+    @objc private func inputSelected(_ sender: NSMenuItem) {
+        devices.selectedUID = sender.representedObject as? String
     }
 
     func setRecording(_ recording: Bool) {
