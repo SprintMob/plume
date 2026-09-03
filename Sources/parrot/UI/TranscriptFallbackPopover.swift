@@ -44,8 +44,10 @@ final class TranscriptFallbackPopover {
             rootView: TranscriptFallbackView(
                 transcript: transcript,
                 onCopy: { [weak self] in
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(transcript, forType: .string)
+                    // The dictation put it there before the probe ran, so this
+                    // rewrites only if something else has taken the pasteboard
+                    // since — which is the whole reason the button exists.
+                    TextInjector.copyToPasteboard(transcript)
                     self?.hide()
                 },
                 onDismiss: { [weak self] in
@@ -117,14 +119,14 @@ private struct TranscriptFallbackView: View {
                 )
 
             HStack {
-                Text("Copy it, then select a text field.")
+                Text("Copied \u{2014} press \u{2318}V where you want it.")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.65))
 
                 Spacer()
 
                 Button(action: onCopy) {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label("Copy again", systemImage: "doc.on.doc")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.plain)

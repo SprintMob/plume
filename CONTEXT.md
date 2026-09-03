@@ -28,7 +28,7 @@ _Avoid_: tap-to-talk, lock mode (Fn-locked hold-to-talk is a third, distinct thi
 
 **Text injection**:
 Getting transcribed text into the focused app, whether by synthesising keystrokes
-or by writing to the pasteboard and pasting.
+or by pasting what the pasteboard guarantee has already written.
 _Avoid_: paste, typing, output (each names one implementation of it)
 
 **Doctor**:
@@ -89,6 +89,22 @@ focus probe is blind to every browser text field — see
 [ADR-0005](./docs/adr/0005-wake-chromium-accessibility.md).
 _Avoid_: enabling accessibility (that names the permission macOS grants parrot,
 which is a different thing entirely)
+
+**Pasteboard guarantee**:
+Every non-empty transcript is written to the pasteboard before parrot does anything
+else with it, so a dictation survives a focus probe that hangs, a password box, and
+an app that drops synthesized keystrokes. Unconditional, in both injection modes,
+and it replaces what was copied before without putting it back — see
+[ADR-0006](./docs/adr/0006-transcript-always-on-the-pasteboard.md).
+_Avoid_: clipboard backup, auto-copy, copy fallback (it is not a fallback: it
+happens on every dictation, including the ones that inject cleanly)
+
+**Transcript fallback**:
+Where a dictation goes when the focus probe finds nowhere to put it: a panel showing
+the transcript the pasteboard guarantee has already copied, with a Copy button for
+the case where something else has taken the pasteboard since.
+_Avoid_: popover, bubble (the type is named `TranscriptFallbackPopover` but it is an
+`NSPanel`)
 
 **Launch agent**:
 The per-user `com.digimata.parrot` job that keeps the daemon running at login. Its

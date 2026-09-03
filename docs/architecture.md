@@ -101,13 +101,24 @@ Adding an engine = one new file conforming to `Transcriber`.
 
 ### `TextInjector`
 
-`CGEventCreateKeyboardEvent` + `CGEventKeyboardSetUnicodeString` — pastes the transcript at the current cursor position. Works in nearly every text field on macOS (some Electron apps and secure fields are flaky; platform constraint).
+Delivers the transcript, pasteboard first. Every non-empty transcript is written to the pasteboard before anything else happens to it — in both modes, and whether or not a field was found. That is the pasteboard guarantee: the daemon copies before the focus probe runs, so a probe that hangs, a password box, or an app that swallows what we send it cannot lose a dictation. What the user had copied is replaced and never put back. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md).
+
+How the transcript is then delivered to the focused app is picked from the menu bar or `--inject-mode`:
+
+- `paste` (default) — posts ⌘V and lets the app read the pasteboard.
+- `type-unicode` — `CGEventKeyboardSetUnicodeString`, the original mode. Slower, and silently dropped by apps that ignore synthesized unicode. It no longer leaves the pasteboard alone; nothing does.
+
+`copyToPasteboard` is the guarantee on its own, called before the probe and again by `inject`. A repeat write of the same string that nothing has taken since is skipped, so one dictation is one entry in a clipboard manager. Keystrokes leave through a `KeyStroke` seam (`.commandV`, `.unicode`) rather than as `CGEvent`s, which is what lets the tests watch a delivery without posting into the session.
 
 ### `FocusedTextTarget` and `AccessibilityOptIn`
 
 The focus probe. `FocusedTextTarget.probe()` reads the system-wide focused element and walks up to 6 ancestors and 96 descendants asking whether any of them can take text, under a 0.6 s budget so a slow app cannot block the main actor. A secure field is refused outright — a transcript must never be delivered into a password box. `FocusRules` holds the decision as a pure function over `ElementFacts`, which is where its tests live.
 
 `AccessibilityOptIn` is what makes the probe work in a browser. Chromium and Electron apps keep their accessibility tree off until an assistive technology asks, so parrot asks — `AXEnhancedUserInterface` and `AXManualAccessibility` on the focused app, as each dictation starts. See [ADR-0005](./adr/0005-wake-chromium-accessibility.md); `--no-wake-accessibility` turns it off, `--debug-focus` reports what the probe saw.
+
+### `TranscriptFallbackPopover`
+
+The transcript fallback: when the probe finds nowhere to put the text, this panel tells the user the dictation went to the pasteboard instead. The transcript is already there — the pasteboard guarantee put it there before the probe ran — so the Copy button is for the narrower case where something else has taken the pasteboard since. A borderless non-activating `NSPanel` at `.statusBar` level, bottom-center, sharing the overlay's anchor.
 
 ### `RecordingOverlay`
 
@@ -216,9 +227,10 @@ Models live in `~/Library/Application Support/parrot/models/`. Not bundled — f
 8. `HotkeyMonitor` fires `.released`. Overlay switches to spinner. Status: `transcribing`.
 9. `AudioCapture` stops, hands buffer to active `Transcriber`.
 10. `Transcriber` runs CoreML inference. Returns string.
-11. `TextInjector` posts the string at the cursor.
-12. Overlay hides. Status: `listening`. Loop.
-13. User hits `^C`. Process exits cleanly.
+11. Overlay hides. Status: `listening`. The transcript goes to the pasteboard — before the probe, so nothing the probe does can lose it.
+12. `FocusedTextTarget.probe()` asks whether the focused element can take text. On a No it wakes the app's accessibility tree and asks once more.
+13. Editable → `TextInjector` delivers the string at the cursor. Not editable, or a secure field → `TranscriptFallbackPopover` shows what is already on the pasteboard. Loop.
+14. User hits `^C`. Process exits cleanly.
 
 End-to-end latency target: <500 ms after hotkey release for utterances under 10 seconds, on Apple Silicon.
 
@@ -226,7 +238,7 @@ End-to-end latency target: <500 ms after hotkey release for utterances under 10 
 
 - No streaming partial transcripts in v1. Press, speak, release, get full text.
 - No VAD-based hands-free mode. Push-to-talk is more reliable and uses zero idle CPU.
-- No history, transcript log, or clipboard manager. Output goes to the cursor and that's it.
+- No transcript log and no clipboard manager. Nothing parrot produces is written to disk. Output goes to the cursor, and to the pasteboard on the way — one entry, overwritten every dictation. (This bullet originally ruled out the pasteboard as an output at all. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md).)
 - No custom vocabulary, prompts, or post-processing.
 - No menubar, no settings window, no preferences panel. The only UI is the recording overlay. Configuration is flags + TOML.
 
@@ -259,7 +271,7 @@ parrot/
 
     Input/
       HotkeyMonitor.swift       # CGEventTap
-      TextInjector.swift        # CGEvent posting
+      TextInjector.swift        # CGEvent posting + pasteboard
       FocusedTextTarget.swift   # the focus probe
       AccessibilityOptIn.swift  # wakes Chromium/Electron a11y trees
 

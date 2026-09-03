@@ -243,6 +243,13 @@ struct Run: ParsableCommand {
                     await MainActor.run {
                         overlay?.hide()
                         menuBar.setRecording(false)
+                        // Before anything that can hang or refuse: the probe
+                        // below spends up to 0.6s in the accessibility API,
+                        // twice, on an app that may never answer. Whatever
+                        // happens after this line, the dictation is on the
+                        // pasteboard. Empty text is left alone in there, which
+                        // is why this can run before the guard.
+                        TextInjector.copyToPasteboard(text)
                     }
                     guard !text.isEmpty else { return }
 

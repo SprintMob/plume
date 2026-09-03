@@ -2,94 +2,94 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-/// Delivers the transcript to whatever holds the keyboard focus.
+/// Delivers the transcript: to the pasteboard always, and to the focused app when
+/// there is a field to speak into.
+///
+/// The pasteboard write is the guarantee. Every non-empty transcript that reaches
+/// this type is on the pasteboard when the call returns — in both modes, whether
+/// or not the focused app takes what we send it. What the user had copied is
+/// replaced and never put back: that is the deliberate trade, and it is what a
+/// clipboard manager is for. See [ADR-0006](../../../docs/adr/0006-transcript-always-on-the-pasteboard.md).
 @MainActor
 enum TextInjector {
     enum Mode: String, CaseIterable {
-        /// Put the text on the pasteboard and synthesize ⌘V, then restore the
-        /// previous pasteboard contents. Terminals and Electron apps read key
-        /// events in ways that drop synthesized unicode, but all of them
-        /// implement paste.
+        /// Post ⌘V and let the focused app read the pasteboard. Terminals and
+        /// Electron apps read key events in ways that drop synthesized unicode,
+        /// but all of them implement paste.
         case paste
-        /// Synthesize the characters directly. Leaves the pasteboard alone, but
-        /// silently loses text in apps that ignore unicode-string key events.
+        /// Synthesize the characters directly. Slower, and silently loses text in
+        /// apps that ignore unicode-string key events. The transcript reaches the
+        /// pasteboard either way; the mode picks only how it is delivered.
         case typeUnicode = "type-unicode"
     }
 
-    /// Grace period for the target app to read the pasteboard before we put the
-    /// user's previous contents back. Paste is asynchronous in the target, so
-    /// restoring immediately races it.
-    private static let pasteSettleDelay: TimeInterval = 0.25
-
-    static func inject(_ text: String, mode: Mode = .paste) {
-        guard !text.isEmpty else { return }
-        switch mode {
-        case .paste: pasteInject(text)
-        case .typeUnicode: unicodeInject(text)
-        }
+    /// What a delivery asks of the keyboard, stated as an intent rather than as a
+    /// `CGEvent`. Posting needs the accessibility grant and lands in whatever
+    /// window has focus — a `swift test` run included — so this is the seam the
+    /// tests replace, and no test ever posts anything.
+    enum KeyStroke: Equatable {
+        case commandV
+        case unicode([UniChar])
     }
 
-    // MARK: - Paste
-
-    /// The user's pasteboard, held while one or more injections are in flight.
-    private static var savedContents: [[NSPasteboard.PasteboardType: Data]]?
-    private static var restoreGeneration = 0
-
-    private static func pasteInject(_ text: String) {
-        let pasteboard = NSPasteboard.general
-
-        // Only snapshot when no restore is already pending. Two injections
-        // inside the settle delay would otherwise capture the first one's text
-        // as "the user's pasteboard" and restore that, losing the real contents.
-        if savedContents == nil {
-            savedContents = snapshot(pasteboard)
-        }
-        restoreGeneration &+= 1
-        let generation = restoreGeneration
-
+    /// Puts the transcript where the user can reach it. The daemon calls this
+    /// before the focus probe, so a probe that hangs, a password box, or an app
+    /// that swallows synthesized keys cannot cost the user their dictation.
+    /// Whatever was copied before is replaced and never put back.
+    ///
+    /// Empty text is left alone: a dictation that produced nothing must not clear
+    /// the pasteboard, and this guard is what lets the call site copy before it
+    /// has checked. A pasteboard already holding exactly this string is left
+    /// alone too, so one dictation is one entry in a clipboard manager rather
+    /// than two identical ones.
+    static func copyToPasteboard(_ text: String, to pasteboard: NSPasteboard = .general) {
+        guard !text.isEmpty else { return }
+        guard pasteboard.string(forType: .string) != text else { return }
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        postCommandV()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + pasteSettleDelay) {
-            // Superseded by a later injection; that one owns the restore.
-            guard generation == restoreGeneration else { return }
-            if let saved = savedContents {
-                restore(saved, to: pasteboard)
-            }
-            savedContents = nil
-        }
     }
 
-    /// Capture every representation of every item, not just the plain string —
-    /// otherwise dictating over a copied image or file silently destroys it.
-    private static func snapshot(
-        _ pasteboard: NSPasteboard
-    ) -> [[NSPasteboard.PasteboardType: Data]] {
-        (pasteboard.pasteboardItems ?? []).map { item in
-            var contents: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types {
-                if let data = item.data(forType: type) { contents[type] = data }
-            }
-            return contents
-        }
-    }
-
-    private static func restore(
-        _ snapshot: [[NSPasteboard.PasteboardType: Data]],
-        to pasteboard: NSPasteboard
+    /// Delivers the transcript to whatever holds the keyboard focus. The
+    /// pasteboard write comes first in both modes: an injection the app drops
+    /// still leaves the user one ⌘V from their text.
+    static func inject(
+        _ text: String,
+        mode: Mode = .paste,
+        to pasteboard: NSPasteboard = .general,
+        post: (KeyStroke) -> Void = postToSession
     ) {
-        pasteboard.clearContents()
-        guard !snapshot.isEmpty else { return }
-        pasteboard.writeObjects(
-            snapshot.map { contents in
-                let item = NSPasteboardItem()
-                for (type, data) in contents { item.setData(data, forType: type) }
-                return item
-            })
+        guard !text.isEmpty else { return }
+        copyToPasteboard(text, to: pasteboard)
+        switch mode {
+        case .paste:
+            post(.commandV)
+        case .typeUnicode:
+            for chunk in chunks(of: text) { post(.unicode(chunk)) }
+        }
     }
 
-    private static func postCommandV() {
+    /// `keyboardSetUnicodeString` has a per-event limit of around 20 UTF-16
+    /// units, so a transcript goes out in chunks. Units, not characters: units
+    /// are what the API counts. Pure, and the only decision left in the type,
+    /// which is where its test lives.
+    nonisolated static func chunks(of text: String, size: Int = 20) -> [[UniChar]] {
+        let units = Array(text.utf16)
+        return stride(from: 0, to: units.count, by: size).map { start in
+            Array(units[start..<min(start + size, units.count)])
+        }
+    }
+
+    // MARK: - Posting
+
+    /// The production adapter: an intent, turned into posted CoreGraphics events.
+    nonisolated static func postToSession(_ stroke: KeyStroke) {
+        switch stroke {
+        case .commandV: postCommandV()
+        case .unicode(let chunk): postUnicode(chunk)
+        }
+    }
+
+    private nonisolated static func postCommandV() {
         // Keycode 9 is `v` on the ASCII-capable layout macOS uses to match
         // command key equivalents, so this stays correct on non-QWERTY layouts.
         let vKey: CGKeyCode = 9
@@ -107,23 +107,8 @@ enum TextInjector {
         up.post(tap: .cgAnnotatedSessionEventTap)
     }
 
-    // MARK: - Unicode
-
-    /// Splits into chunks because the underlying API has a per-event character
-    /// limit (~20 chars).
-    private static func unicodeInject(_ text: String) {
-        let utf16 = Array(text.utf16)
-        let chunkSize = 20
-        var index = 0
-        while index < utf16.count {
-            let end = min(index + chunkSize, utf16.count)
-            var chunk = Array(utf16[index..<end])
-            postChunk(&chunk)
-            index = end
-        }
-    }
-
-    private static func postChunk(_ chunk: inout [UniChar]) {
+    private nonisolated static func postUnicode(_ chunk: [UniChar]) {
+        var chunk = chunk
         let length = chunk.count
         guard length > 0 else { return }
 

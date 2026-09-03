@@ -21,7 +21,7 @@ The installer drops the binary in `/usr/local/bin/parrot`. Builds are unsigned f
 3. **Hold the `fn` key, speak, release.** A small pill appears at the bottom of the screen while the mic is hot.
 4. **For hands-free dictation, double-tap `fn`.** The recording stays active and a lock appears beside the waveform.
 5. **Tap `fn` once to stop a locked dictation.** Parrot restores audio, transcribes, and types at the cursor.
-6. **The transcript types itself in at the cursor** after recording stops. Usually within 200-300ms. If no editable text field has the focus, a popover holds the transcript so you can copy it instead of losing it.
+6. **The transcript types itself in at the cursor** after recording stops. Usually within 200-300ms. It goes to the clipboard every time as well, so ⌘V gets it back if the app swallowed it — and if no editable text field has the focus, a panel shows you the transcript and tells you it's waiting on the clipboard.
 
 That's it. There is no record button, no stop button, no "send" — `fn` is the whole interface.
 
@@ -69,15 +69,20 @@ to.
 
 ### Injection modes
 
-`--inject-mode paste` (the default) puts the transcript on the pasteboard,
-sends ⌘V, and restores your previous pasteboard contents. Terminals and
-Electron apps discard synthesized unicode key events but all handle paste, so
-this is the mode that works everywhere.
-
-`--inject-mode type-unicode` synthesizes the characters directly and never
-touches the pasteboard, at the cost of silently dropping text in those apps.
-
 Also selectable from the menu bar under **Injection**, and remembered the same way.
+
+Whichever you pick, the transcript goes to the clipboard first, every time —
+including when there is nowhere to inject it. It replaces what you had copied
+and does not put it back, so pair parrot with a clipboard manager if you care
+about your history.
+
+`--inject-mode paste` (the default) sends ⌘V and lets the app read the
+clipboard. Terminals and Electron apps discard synthesized unicode key events
+but all handle paste, so this is the mode that works everywhere.
+
+`--inject-mode type-unicode` synthesizes the characters directly, at the cost of
+silently dropping text in those apps. It used to leave the clipboard untouched;
+it no longer does.
 
 ### Mute while dictating
 
@@ -90,6 +95,11 @@ or Spotify is not playing into the microphone.
 Transcripts are never written to disk. The daemon logs timing and length only
 (`→ 0.42s · 63 chars`); `--echo-transcripts` prints the full text to stderr, and its
 help text says so, but it is never used by the LaunchAgent.
+
+Every transcript goes to the clipboard as well (see [Injection modes](#injection-modes)).
+Parrot keeps no history of its own — each dictation overwrites the last — but if you run
+a clipboard manager, that manager's history is a transcript log on disk. Parrot can
+promise it writes none; it cannot promise nothing does.
 
 `parrot install --launch-at-login` discards the daemon's output. To keep it, add
 `--log-file` and it goes to `~/Library/Logs/parrot.log`, created `0600` and owned by you.
