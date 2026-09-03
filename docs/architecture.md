@@ -75,7 +75,7 @@ Subcommands:
 
 ### `HotkeyMonitor`
 
-Global hotkey via `CGEventTap` (requires Accessibility permission). Default: **hold Fn**. Detected via `flagsChanged` events with `NSEvent.ModifierFlags.function` / `kCGEventFlagMaskSecondaryFn`. Emits `.pressed` / `.released`. Configurable via `--hotkey` flag or config file.
+Global hotkey via `CGEventTap` (requires Accessibility permission). Default: **hold Fn**. Detected via `flagsChanged` events with `NSEvent.ModifierFlags.function` / `kCGEventFlagMaskSecondaryFn`. Emits `.pressed` / `.released` / `.interrupted`. Configurable via the `--hotkey` flag or the menu bar, which swaps the watched modifier in place — the tap already sees every `flagsChanged` event, so only the comparison changes and nothing is rebuilt.
 
 **Fn key caveat:** macOS by default maps the Fn (🌐) key to "Show Emoji & Symbols" or "Start Dictation" depending on the user's setting in System Settings → Keyboard → Press 🌐 key to. The CGEventTap sees the keypress regardless, but the system action also fires. `parrot doctor` will detect this setting and instruct the user to change it to "Do Nothing" so Fn becomes a clean modifier.
 
@@ -156,18 +156,24 @@ The registry is the single source of truth for: download URLs, file names, sizes
 
 On first selection (or via `parrot models download <id>`), downloads to `~/Library/Application Support/parrot/models/<engine>/<id>/`. Progress bar to stderr (using `\r` overwrites). Resumable, validates size. Refuses to start the daemon if the selected model isn't present.
 
-### `Config`
+### Settings
 
-Plain `Codable` struct. Loaded from (in order): CLI flags > `~/.config/parrot/config.toml` > defaults.
+One `UserDefaults`-backed store per concern, each resolving the same way: the CLI
+flag wins for the launch that passes it, else the remembered choice, else the
+default. A stored value that no longer parses falls through to the default rather
+than failing the launch.
 
-```toml
-model = "whisper-large-v3-turbo"
-hotkey = "fn"
-inject_mode = "paste"   # or "type-unicode"
-overlay = true          # show recording pill at bottom of screen
-```
+| Store | Keys | Chosen from |
+|---|---|---|
+| `ModelStore` | `modelID`, `previousModelID` | menu bar → Model |
+| `InputDeviceStore` | `inputDeviceUID` | menu bar → Input |
+| `SettingsStore` | `hotkey`, `injectMode` | menu bar → Hold-to-talk key, Injection |
 
-CLI flags override the file. No settings UI; you edit the TOML.
+The TOML file at `~/.config/parrot/config.toml` this section used to specify was
+never built; see [ADR-0004](./adr/0004-settings-in-userdefaults.md) for why the
+merge queue settled on `UserDefaults` instead. The launch agent deliberately bakes
+neither `hotkey` nor `injectMode` into its `ProgramArguments`, since a flag there
+would override the menu bar on every login.
 
 ## Permissions
 
@@ -235,7 +241,7 @@ parrot/
   Package.swift                 # SPM, single executable target
   Sources/parrot/
     main.swift                  # entry point, argument parsing, NSApp.run()
-    Config.swift
+    SettingsStore.swift
     Doctor.swift
 
     Transcription/              # the inference layer

@@ -35,7 +35,7 @@ parrot setup                           # one-time setup: permissions + model dow
 parrot install --launch-at-login       # register a LaunchAgent (background daemon)
 parrot install --uninstall             # remove the LaunchAgent
 parrot install --purge-legacy-logs     # delete world-readable /tmp logs from older versions
-parrot doctor                          # check permissions + fn key setting
+parrot doctor                          # check permissions + push-to-talk key setting
 parrot models list                     # list available models
 parrot models download <id>            # pre-download a model
 parrot --model whisper-large-v3-turbo  # bigger, multilingual, slower first-run
@@ -61,6 +61,12 @@ parrot --hotkey left-option
 your keyboard actually emits. Note that it logs every key you press while it
 runs, so use it to identify a key and then stop it.
 
+You can also pick the key from the menu bar, under **Hold-to-talk key**. It takes
+effect immediately — no restart — and is remembered, so a daemonized install keeps
+it across logins without re-running `parrot install`. The flag stays useful for a
+one-off run: it sets the key for that launch without changing what you come back
+to.
+
 ### Injection modes
 
 `--inject-mode paste` (the default) puts the transcript on the pasteboard,
@@ -70,6 +76,8 @@ this is the mode that works everywhere.
 
 `--inject-mode type-unicode` synthesizes the characters directly and never
 touches the pasteboard, at the cost of silently dropping text in those apps.
+
+Also selectable from the menu bar under **Injection**, and remembered the same way.
 
 ### Mute while dictating
 

@@ -56,10 +56,12 @@ final class HotkeyMonitor {
     }
 
     /// Mask of the modifier we treat as the hotkey. Fn = `.maskSecondaryFn`.
-    private let mask: CGEventFlags
+    /// Mutable so the modifier can be swapped from the menu bar without the tap
+    /// being torn down and rebuilt.
+    private var mask: CGEventFlags
     /// When set, only flagsChanged events with this keycode are considered,
     /// so left/right variants of a modifier can be told apart.
-    private let keycode: Int64?
+    private var keycode: Int64?
     private let debug: Bool
     private var onEvent: ((Event) -> Void)?
     private var tap: CFMachPort?
@@ -75,6 +77,21 @@ final class HotkeyMonitor {
     /// Resolve a named modifier to the flag and keycode it is watched by.
     convenience init(hotkey: Hotkey, debug: Bool = false) {
         self.init(mask: hotkey.mask, keycode: hotkey.keycode, debug: debug)
+    }
+
+    /// Watch a different modifier from now on. The tap already receives every
+    /// flagsChanged event, so only the comparison in `handle()` depends on the
+    /// choice and nothing has to be restarted.
+    func setHotkey(_ hotkey: Hotkey) {
+        mask = hotkey.mask
+        keycode = hotkey.keycode
+        // A key held under the old modifier can never send a release we would
+        // recognise, so the reset `reEnable()` does applies here too: without
+        // it a recording started before the switch never ends.
+        if isPressed {
+            isPressed = false
+            onEvent?(.interrupted)
+        }
     }
 
     func start(onEvent: @escaping (Event) -> Void) throws {

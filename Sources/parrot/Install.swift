@@ -1,6 +1,12 @@
 import ArgumentParser
 import Foundation
 
+enum InstallError: Error {
+    /// Nothing executable at /usr/local/bin/parrot and no usable argv[0]. The
+    /// agent would name a binary that is not there.
+    case binaryNotFound
+}
+
 /// Manage parrot's LaunchAgent so the daemon starts at login.
 ///
 /// We deliberately do NOT use SMAppService.mainApp here — that requires a full
@@ -23,11 +29,11 @@ struct Install: ParsableCommand {
     @Flag(name: .long, help: "Delete the world-readable /tmp/parrot.{out,err}.log files left by earlier versions.")
     var purgeLegacyLogs: Bool = false
 
-    @Option(name: .long, help: "Push-to-talk modifier to bake into the agent.")
-    var hotkey: HotkeyMonitor.Hotkey = .fn
+    @Option(name: .long, help: "Push-to-talk modifier to remember as the default.")
+    var hotkey: HotkeyMonitor.Hotkey?
 
-    @Option(name: .long, help: "Injection mode to bake into the agent.")
-    var injectMode: TextInjector.Mode = .paste
+    @Option(name: .long, help: "Injection mode to remember as the default.")
+    var injectMode: TextInjector.Mode?
 
     func run() throws {
         if launchAtLogin && uninstall {
@@ -45,13 +51,44 @@ struct Install: ParsableCommand {
 
         reportLegacyLogs()
         if purgeLegacyLogs {
-            purgeLegacyLogFiles()
+            reportPurgedLegacyLogs()
         }
 
-        if uninstall {
-            try removeAgent()
-        } else if launchAtLogin {
-            try writeAgent()
+        // Recorded rather than baked into the agent's argv: a flag in
+        // ProgramArguments wins over the remembered choice on every launch,
+        // which would quietly undo anything picked in the menu bar.
+        let settings = SettingsStore()
+        if let hotkey { settings.hotkey = hotkey }
+        if let injectMode { settings.injectMode = injectMode }
+
+        do {
+            if uninstall {
+                let removed = try Install.removeAgent()
+                print(removed
+                    ? "✓ launch-at-login removed"
+                    : "nothing to remove (no agent at \(Install.plistURL.path))")
+            } else if launchAtLogin {
+                try reportInstalled(Install.writeAgent(logFile: logFile))
+            }
+        } catch InstallError.binaryNotFound {
+            FileHandle.standardError.write(Data(
+                "couldn't locate the parrot binary. install it to /usr/local/bin/parrot first.\n".utf8
+            ))
+            throw ExitCode(1)
+        }
+    }
+
+    private func reportInstalled(_ agent: Install.Agent) {
+        let settings = SettingsStore()
+        print("✓ launch-at-login installed")
+        print("  plist:  \(agent.plistPath)")
+        print("  binary: \(agent.binary)")
+        print("  hotkey: \(settings.resolvedHotkey(flag: nil).rawValue)")
+        print("  inject: \(settings.resolvedInjectMode(flag: nil).rawValue)")
+        if logFile {
+            print("  logs:   \(agent.logPath) (mode 0600)")
+        } else {
+            print("  logs:   discarded — pass --log-file to keep them")
         }
     }
 
@@ -59,14 +96,42 @@ struct Install: ParsableCommand {
 
     private static let label = "com.digimata.parrot"
 
-    private var plistURL: URL {
+    /// Applies to every file *and directory* the daemon creates, not just the
+    /// log — launchd has no way to scope it. 0o077 gives files 0600 and
+    /// directories 0700.
+    ///
+    /// It must keep the owner execute bit. 0o177 yields the same 0600 for
+    /// files but 0600 for directories too, and a directory without `x` cannot
+    /// be written into: the model downloader then fails every warmup with
+    /// EACCES and `KeepAlive` turns that into a relaunch loop. That is what
+    /// shipped from wave 1 until it was hit on a real install.
+    static let logUmask = 0o077
+
+    /// What `writeAgent` produced, so the caller can report it. The command
+    /// prints these lines; the settings window shows the same facts as a row.
+    struct Agent {
+        let plistPath: String
+        let binary: String
+        let logPath: String
+    }
+
+    /// Shared with `DoctorReport.checkLaunchAgentArgs`, which reads the agent
+    /// this writes.
+    static var plistURL: URL {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return home
             .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
             .appendingPathComponent("\(Self.label).plist")
     }
 
-    private func writeAgent() throws {
+    static var isAgentInstalled: Bool {
+        FileManager.default.fileExists(atPath: plistURL.path)
+    }
+
+    /// Writes the agent and bootstraps it. Prints nothing: both the command and
+    /// the settings window call this, and only one of them has a terminal.
+    @discardableResult
+    static func writeAgent(logFile: Bool) throws -> Agent {
         let binary = try resolveBinaryPath()
 
         let logPath: String
@@ -78,13 +143,11 @@ struct Install: ParsableCommand {
 
         // ProgramArguments deliberately omits --echo-transcripts: a background
         // daemon must never be configured to write transcript text to a log.
+        // It also omits --hotkey and --inject-mode, which are remembered
+        // instead, so the menu bar can change them and have it stick.
         var plist: [String: Any] = [
             "Label": Self.label,
-            "ProgramArguments": [
-                binary, "run", "--skip-doctor",
-                "--hotkey", hotkey.rawValue,
-                "--inject-mode", injectMode.rawValue,
-            ],
+            "ProgramArguments": [binary, "run", "--skip-doctor"],
             "RunAtLoad": true,
             "KeepAlive": ["SuccessfulExit": false] as [String: Any],
             "ProcessType": "Interactive",
@@ -94,11 +157,10 @@ struct Install: ParsableCommand {
         if logFile {
             // launchd recreates a missing std-path file under its own umask
             // (0644), so the 0600 degrades the first time the log is deleted.
-            // plists can't encode octal: 127 is 0o177.
-            plist["Umask"] = 127
+            plist["Umask"] = Self.logUmask
         }
 
-        let url = plistURL
+        let url = Self.plistURL
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -119,19 +181,12 @@ struct Install: ParsableCommand {
             ))
         }
 
-        print("✓ launch-at-login installed")
-        print("  plist:  \(url.path)")
-        print("  binary: \(binary)")
-        if logFile {
-            print("  logs:   \(logPath) (mode 0600)")
-        } else {
-            print("  logs:   discarded — pass --log-file to keep them")
-        }
+        return Agent(plistPath: url.path, binary: binary, logPath: logPath)
     }
 
     /// launchd appends to an existing std-path file and leaves its mode alone,
     /// but creates a missing one at 0644 — so create it 0600 before bootstrap.
-    private func prepareLogFile() throws -> String {
+    private static func prepareLogFile() throws -> String {
         let fm = FileManager.default
         let url = fm.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs", isDirectory: true)
@@ -152,14 +207,18 @@ struct Install: ParsableCommand {
         return url.path
     }
 
-    private static let legacyLogPaths = ["/tmp/parrot.out.log", "/tmp/parrot.err.log"]
+    static let legacyLogPaths = ["/tmp/parrot.out.log", "/tmp/parrot.err.log"]
+
+    static func foundLegacyLogs() -> [String] {
+        legacyLogPaths.filter { FileManager.default.fileExists(atPath: $0) }
+    }
 
     /// Versions up to v0.0.5 pointed the daemon's stderr at /tmp and logged
     /// every transcript, so anyone who ran `--launch-at-login` has a plaintext
     /// record of everything they dictated, readable by any local user.
     private func reportLegacyLogs() {
         let fm = FileManager.default
-        let found = Self.legacyLogPaths.filter { fm.fileExists(atPath: $0) }
+        let found = Self.foundLegacyLogs()
         guard !found.isEmpty else { return }
 
         var msg = "\n⚠️  found logs from an earlier parrot version:\n"
@@ -177,37 +236,50 @@ struct Install: ParsableCommand {
         FileHandle.standardError.write(Data(msg.utf8))
     }
 
-    private func purgeLegacyLogFiles() {
+    /// Deletes what it can and answers both halves, so the caller decides how
+    /// to say it. Doctor flags these files; the settings window offers the same
+    /// removal as the remediation for that check.
+    static func purgeLegacyLogFiles() -> (removed: [String], failed: [String]) {
         let fm = FileManager.default
-        let found = Self.legacyLogPaths.filter { fm.fileExists(atPath: $0) }
-        if found.isEmpty {
-            print("no legacy /tmp logs to remove")
-            return
-        }
-        for path in found {
+        var removed: [String] = []
+        var failed: [String] = []
+        for path in foundLegacyLogs() {
             do {
                 try fm.removeItem(atPath: path)
-                print("✓ removed \(path)")
+                removed.append(path)
             } catch {
+                failed.append(path)
                 FileHandle.standardError.write(Data(
                     "couldn't remove \(path): \(error)\n".utf8
                 ))
             }
         }
+        return (removed, failed)
     }
 
-    private func removeAgent() throws {
-        let url = plistURL
-        if FileManager.default.fileExists(atPath: url.path) {
-            _ = runLaunchctl(["bootout", "gui/\(uid())", url.path])
-            try FileManager.default.removeItem(at: url)
-            print("✓ launch-at-login removed")
-        } else {
-            print("nothing to remove (no agent at \(url.path))")
+    private func reportPurgedLegacyLogs() {
+        let outcome = Self.purgeLegacyLogFiles()
+        if outcome.removed.isEmpty && outcome.failed.isEmpty {
+            print("no legacy /tmp logs to remove")
+            return
+        }
+        for path in outcome.removed {
+            print("✓ removed \(path)")
         }
     }
 
-    private func resolveBinaryPath() throws -> String {
+    /// Answers whether there was an agent to remove, so the caller can say so
+    /// in its own words.
+    @discardableResult
+    static func removeAgent() throws -> Bool {
+        let url = plistURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        _ = runLaunchctl(["bootout", "gui/\(uid())", url.path])
+        try FileManager.default.removeItem(at: url)
+        return true
+    }
+
+    private static func resolveBinaryPath() throws -> String {
         // /usr/local/bin/parrot is the canonical install path. Honor a real
         // location if running from elsewhere (e.g. dev).
         let candidate = "/usr/local/bin/parrot"
@@ -222,15 +294,12 @@ struct Install: ParsableCommand {
             ))
             return argv0
         }
-        FileHandle.standardError.write(Data(
-            "couldn't locate the parrot binary. install it to /usr/local/bin/parrot first.\n".utf8
-        ))
-        throw ExitCode(1)
+        throw InstallError.binaryNotFound
     }
 
-    private func uid() -> uid_t { getuid() }
+    private static func uid() -> uid_t { getuid() }
 
-    private func runLaunchctl(_ args: [String]) -> (status: Int32, stderr: String) {
+    private static func runLaunchctl(_ args: [String]) -> (status: Int32, stderr: String) {
         let task = Process()
         task.launchPath = "/bin/launchctl"
         task.arguments = args

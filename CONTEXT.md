@@ -35,6 +35,15 @@ _Avoid_: paste, typing, output (each names one implementation of it)
 The built-in self-check (`parrot doctor`) reporting whether permissions, models and
 the launch agent are in a usable state.
 
+**Remembered choice**:
+A setting picked in the menu bar that survives a restart, held in `UserDefaults` by
+one `*Store` type per concern — `SettingsStore` for the modifier and the injection
+mode, `InputDeviceStore` for the microphone, `ModelStore` for the active model id.
+All resolve alike: the flag wins for the launch that passes it, else the remembered
+value, else the default. Note `ModelStore` the type is not the **Model store**
+below, which is a directory of weights.
+_Avoid_: config, preferences, config file (there is no file — see [ADR-0004](./docs/adr/0004-settings-in-userdefaults.md))
+
 ### Speech models
 
 **Model**:

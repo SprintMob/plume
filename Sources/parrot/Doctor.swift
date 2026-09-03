@@ -16,13 +16,53 @@ struct Check {
 }
 
 enum DoctorReport {
-    static func run() -> [Check] {
-        [
+    /// `hotkey` is required rather than defaulted so no caller can quietly
+    /// assume Fn: the Fn mapping is only worth checking when Fn is the modifier
+    /// actually being watched, and its failures otherwise block startup for a
+    /// user who never asked for it.
+    static func run(hotkey: HotkeyMonitor.Hotkey) -> [Check] {
+        var checks = [
             checkMicrophone(),
             checkAccessibility(),
-            checkFnKeyMapping(),
-            checkLegacyLogs(),
         ]
+        if hotkey == .fn {
+            checks.append(checkFnKeyMapping())
+        }
+        checks.append(checkLegacyLogs())
+        checks.append(checkLaunchAgentArgs())
+        return checks
+    }
+
+    /// Versions up to v0.0.6 baked --hotkey and --inject-mode into the launch
+    /// agent's ProgramArguments. A flag still wins over the remembered choice,
+    /// so an agent left from one of those installs silently overrides every
+    /// pick made in the menu bar.
+    static func checkLaunchAgentArgs(at url: URL = Install.plistURL) -> Check {
+        let name = "launch agent"
+        guard let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let arguments = (plist as? [String: Any])?["ProgramArguments"] as? [String]
+        else {
+            return Check(name: name, status: .ok, remediation: nil)
+        }
+        let remembered = ["--hotkey", "--inject-mode"]
+        let stale = remembered.filter(arguments.contains)
+        guard !stale.isEmpty else {
+            return Check(name: name, status: .ok, remediation: nil)
+        }
+        return Check(
+            name: name,
+            status: .warn("\(list(stale)) baked in — overrides the remembered choice"),
+            remediation: "re-run `parrot install --launch-at-login`"
+        )
+    }
+
+    /// "a", "a and b", "a, b and c" — the warning names up to four flags and
+    /// reads as a sentence at every length.
+    private static func list(_ items: [String]) -> String {
+        guard let last = items.last else { return "" }
+        guard items.count > 1 else { return last }
+        return items.dropLast().joined(separator: ", ") + " and " + last
     }
 
     /// Versions up to v0.0.5 sent the daemon's stderr, which included every

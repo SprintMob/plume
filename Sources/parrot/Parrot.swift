@@ -64,8 +64,9 @@ struct Run: ParsableCommand {
             discussion: "Third-party keyboards handle Fn in firmware and never send it to macOS; "
                 + "pick another modifier on those. Options: "
                 + HotkeyMonitor.Hotkey.allCases.map(\.rawValue).joined(separator: ", ")
+                + ". Defaults to whatever was last chosen in the menu bar, else fn."
         ))
-    var hotkey: HotkeyMonitor.Hotkey = .fn
+    var hotkey: HotkeyMonitor.Hotkey?
 
     @Option(
         name: .long,
@@ -73,8 +74,9 @@ struct Run: ParsableCommand {
             "How the transcript is delivered to the focused app.",
             discussion: "paste briefly uses the pasteboard and works in terminals and Electron "
                 + "apps; type-unicode leaves the pasteboard untouched but is dropped by some apps."
+                + " Defaults to whatever was last chosen in the menu bar, else paste."
         ))
-    var injectMode: TextInjector.Mode = .paste
+    var injectMode: TextInjector.Mode?
 
     /// Both purge sites report the same way; the number is the only reason the
     /// user would care that a purge happened at all.
@@ -85,8 +87,14 @@ struct Run: ParsableCommand {
     }
 
     func run() throws {
+        // Resolved before the doctor gate: whether the Fn mapping is worth
+        // checking at all depends on which modifier we end up watching.
+        let settings = SettingsStore()
+        let hotkey = settings.resolvedHotkey(flag: self.hotkey)
+        let injectMode = settings.resolvedInjectMode(flag: self.injectMode)
+
         if !skipDoctor {
-            let checks = DoctorReport.run()
+            let checks = DoctorReport.run(hotkey: hotkey)
             if !DoctorReport.allOK(checks) {
                 FileHandle.standardError.write(Data("startup checks failed:\n".utf8))
                 DoctorReport.print(checks)
@@ -366,11 +374,11 @@ private func dumpWavPath() throws -> String {
 
 struct Doctor: ParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Check microphone, accessibility, and Fn key configuration."
+        abstract: "Check microphone, accessibility, and push-to-talk key configuration."
     )
 
     func run() throws {
-        let checks = DoctorReport.run()
+        let checks = DoctorReport.run(hotkey: SettingsStore().resolvedHotkey(flag: nil))
         DoctorReport.print(checks)
         if !DoctorReport.allOK(checks) {
             throw ExitCode(1)
