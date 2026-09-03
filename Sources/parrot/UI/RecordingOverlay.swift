@@ -141,7 +141,7 @@ private struct OverlayPill: View {
             .padding(.vertical, 9)
             .background(
                 Capsule()
-                    .fill(Color(red: 16/255, green: 18/255, blue: 18/255))
+                    .fill(Style.background)
             )
             .scaleEffect(model.state == .hidden ? 0 : 1)
             .animation(
@@ -160,7 +160,7 @@ private struct OverlayPill: View {
             HStack(spacing: 7) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Color(red: 181/255.0, green: 209/255.0, blue: 255/255.0))
+                    .foregroundStyle(Style.accent)
                 Waveform(levels: model.levels)
                     .frame(width: 54, height: 22)
             }
@@ -176,7 +176,7 @@ private struct OverlayPill: View {
 
 private struct Waveform: View {
     let levels: [Float]
-    private let color = Color(red: 181/255.0, green: 209/255.0, blue: 255/255.0)
+    private let color = Style.accent
 
     var body: some View {
         HStack(alignment: .center, spacing: 4) {

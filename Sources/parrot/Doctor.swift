@@ -36,7 +36,11 @@ enum DoctorReport {
     /// Versions up to v0.0.6 baked --hotkey and --inject-mode into the launch
     /// agent's ProgramArguments. A flag still wins over the remembered choice,
     /// so an agent left from one of those installs silently overrides every
-    /// pick made in the menu bar.
+    /// pick made in the menu bar or the settings window.
+    ///
+    /// --no-overlay and --mute-output joined the list when they became
+    /// remembered choices too: hand-edited agents carry them, and they fail the
+    /// same way.
     static func checkLaunchAgentArgs(at url: URL = Install.plistURL) -> Check {
         let name = "launch agent"
         guard let data = try? Data(contentsOf: url),
@@ -45,7 +49,7 @@ enum DoctorReport {
         else {
             return Check(name: name, status: .ok, remediation: nil)
         }
-        let remembered = ["--hotkey", "--inject-mode"]
+        let remembered = ["--hotkey", "--inject-mode", "--no-overlay", "--mute-output"]
         let stale = remembered.filter(arguments.contains)
         guard !stale.isEmpty else {
             return Check(name: name, status: .ok, remediation: nil)

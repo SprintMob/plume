@@ -60,6 +60,38 @@ final class DoctorLaunchAgentTests: XCTestCase {
         XCTAssertTrue(detail.contains("--inject-mode"), detail)
     }
 
+    /// `--no-overlay` and `--mute-output` joined the check when they became
+    /// remembered choices: a hand-edited agent carrying either overrides the
+    /// settings window the same way a baked `--hotkey` overrides the menu bar.
+    func testBakedOverlayAndMuteFlagsWarn() throws {
+        let url = try writeAgent(arguments: [
+            "/usr/local/bin/parrot", "run", "--skip-doctor", "--no-overlay", "--mute-output",
+        ])
+
+        guard case .warn(let detail) = DoctorReport.checkLaunchAgentArgs(at: url).status else {
+            return XCTFail("expected a warning")
+        }
+        XCTAssertTrue(detail.contains("--no-overlay"), detail)
+        XCTAssertTrue(detail.contains("--mute-output"), detail)
+    }
+
+    /// One flag reads as itself, several read as a sentence.
+    func testTheWarningNamesEveryStaleFlagReadably() throws {
+        let one = try writeAgent(arguments: ["parrot", "run", "--hotkey", "fn"])
+        guard case .warn(let single) = DoctorReport.checkLaunchAgentArgs(at: one).status else {
+            return XCTFail("expected a warning")
+        }
+        XCTAssertTrue(single.hasPrefix("--hotkey baked in"), single)
+
+        let three = try writeAgent(arguments: [
+            "parrot", "run", "--hotkey", "fn", "--inject-mode", "paste", "--mute-output",
+        ])
+        guard case .warn(let many) = DoctorReport.checkLaunchAgentArgs(at: three).status else {
+            return XCTFail("expected a warning")
+        }
+        XCTAssertTrue(many.hasPrefix("--hotkey, --inject-mode and --mute-output baked in"), many)
+    }
+
     /// No agent installed is the common case, not a problem to report.
     func testMissingAgentPasses() {
         let url = directory.appendingPathComponent("nothing-here.plist")

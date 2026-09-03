@@ -5,7 +5,7 @@ enum Engine: String, Codable {
     case parakeet
 }
 
-struct TranscriptionModel: Codable {
+struct TranscriptionModel: Codable, Equatable, Identifiable {
     let id: String
     let displayName: String
     let engine: Engine

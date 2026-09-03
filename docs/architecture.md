@@ -2,7 +2,7 @@
 
 ## Goals
 
-1. **CLI executable.** Single binary, launched from the terminal. No menubar, no dock icon, no settings window.
+1. **CLI executable.** Single binary, launched from the terminal. (The menu bar arrived in wave 3 and the settings window with it; the dock icon appears only while that window is open. See [ADR-0004](./adr/0004-settings-in-userdefaults.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
 2. **Push-to-talk.** Hold Fn, speak, release — transcript appears at the cursor.
 3. **Minimal recording feedback.** A small floating pill at the bottom of the screen while recording, so the user knows the mic is hot. Click-through, borderless, hidden when idle.
 4. **On-device.** No network calls for transcription. Audio never leaves the machine.
@@ -12,7 +12,7 @@
 ## Non-goals
 
 - Cross-platform (macOS only)
-- Menubar, dock icon, settings window, preferences UI
+- ~~Menubar, dock icon, settings window, preferences UI~~ — all three shipped; see ADR-0004 and ADR-0007
 - Cloud transcription providers
 - AI post-processing, summarization, agents
 - Speaker diarization, meeting recording, semantic search
@@ -122,7 +122,7 @@ The transcript fallback: when the probe finds nowhere to put the text, this pane
 
 ### `RecordingOverlay`
 
-A single borderless `NSWindow` displayed at the bottom-center of the active screen while recording. Provides visual feedback that the mic is hot — the only piece of UI in the app.
+A single borderless `NSWindow` displayed at the bottom-center of the active screen while recording. Provides visual feedback that the mic is hot.
 
 Window configuration:
 - `styleMask: .borderless`
@@ -178,13 +178,25 @@ than failing the launch.
 |---|---|---|
 | `ModelStore` | `modelID`, `previousModelID` | menu bar → Model |
 | `InputDeviceStore` | `inputDeviceUID` | menu bar → Input |
-| `SettingsStore` | `hotkey`, `injectMode` | menu bar → Hold-to-talk key, Injection |
+| `SettingsStore` | `hotkey`, `injectMode` | menu bar → Hold-to-talk key, Injection · window → Configuration |
+| `SettingsStore` | `overlay`, `muteOutput`, `sessionHistory` | window → Configuration, Sound |
 
 The TOML file at `~/.config/parrot/config.toml` this section used to specify was
 never built; see [ADR-0004](./adr/0004-settings-in-userdefaults.md) for why the
 merge queue settled on `UserDefaults` instead. The launch agent deliberately bakes
-neither `hotkey` nor `injectMode` into its `ProgramArguments`, since a flag there
-would override the menu bar on every login.
+none of these into its `ProgramArguments`, since a flag there would override the
+menu bar and the settings window on every login.
+
+`overlay` and `muteOutput` were `--no-overlay` and `--mute-output` and nothing
+else until the window needed switches that survive a restart. Both flags still
+reach one way only: there is no `--overlay`, so a flag can silence the pill for a
+run but never force it back on over a remembered "off". `sessionHistory` has no
+flag at all — the history is only readable from the window.
+
+Neither surface owns the live state. `DaemonState` holds it, and both read from
+it: the window through `@ObservedObject`, the menu bar by rebuilding its labels
+when it opens. A closed menu shows nothing, so there is nothing to keep in sync in
+between.
 
 ## Permissions
 
@@ -238,9 +250,9 @@ End-to-end latency target: <500 ms after hotkey release for utterances under 10 
 
 - No streaming partial transcripts in v1. Press, speak, release, get full text.
 - No VAD-based hands-free mode. Push-to-talk is more reliable and uses zero idle CPU.
-- No transcript log and no clipboard manager. Nothing parrot produces is written to disk. Output goes to the cursor, and to the pasteboard on the way — one entry, overwritten every dictation. (This bullet originally ruled out the pasteboard as an output at all. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md).)
+- No transcript log and no clipboard manager. Nothing parrot produces is written to disk. Output goes to the cursor, and to the pasteboard on the way — one entry, overwritten every dictation. Finished dictations are also kept in a capped in-memory buffer for the life of the daemon run, which the window's History section reads and a switch turns off. (This bullet originally ruled out the pasteboard as an output at all, and then ruled out any history. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
 - No custom vocabulary, prompts, or post-processing.
-- No menubar, no settings window, no preferences panel. The only UI is the recording overlay. Configuration is flags + TOML.
+- ~~No settings window and no preferences panel.~~ Configuration is flags, the menu bar, and a settings window with five sections — Home, Configuration, Sound, Models, History — reachable from the menu bar and from ⌘,. The window exposes no capability the daemon did not already have. (This bullet originally ruled out the menu bar too; waves 2 and 3 merged it, and the window followed. See [ADR-0004](./adr/0004-settings-in-userdefaults.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
 
 These are deliberate cuts. Each can be revisited if real usage demands it.
 
@@ -270,13 +282,27 @@ parrot/
       AudioCapture.swift        # AVAudioEngine tap + ring buffer
 
     Input/
-      HotkeyMonitor.swift       # CGEventTap
+      HotkeyMonitor.swift       # CGEventTap, listen-only, watches the hotkey
+      FnDictationGesture.swift  # hold vs double-tap-lock state machine
       TextInjector.swift        # CGEvent posting + pasteboard
       FocusedTextTarget.swift   # the focus probe
       AccessibilityOptIn.swift  # wakes Chromium/Electron a11y trees
 
     UI/
-      RecordingOverlay.swift    # borderless NSWindow + SwiftUI pill
+      RecordingOverlay.swift        # borderless NSPanel + SwiftUI pill
+      MenuBarController.swift       # NSStatusItem and its menu
+      TranscriptFallbackPopover.swift  # transcript fallback panel
+      DaemonState.swift             # live state + remembered choices, read by both surfaces
+      Style.swift                   # the two colours parrot paints its own chrome in
+      Settings/                     # the settings window
+        SettingsWindowController.swift  # NSWindow + main menu + .regular/.accessory
+        SettingsRootView.swift          # sidebar and section routing
+        SettingsControls.swift          # page, group, row, key cap
+        HomeSection.swift               # doctor checks and what parrot is doing
+        ConfigurationSection.swift      # overlay, hotkey, launch agent, injection
+        SoundSection.swift              # microphone, system audio while dictating
+        ModelsSection.swift             # the registry as a table
+        HistorySection.swift            # this run's dictations
 
   Resources/
     models.json

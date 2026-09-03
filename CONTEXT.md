@@ -36,13 +36,42 @@ The built-in self-check (`parrot doctor`) reporting whether permissions, models 
 the launch agent are in a usable state.
 
 **Remembered choice**:
-A setting picked in the menu bar that survives a restart, held in `UserDefaults` by
-one `*Store` type per concern — `SettingsStore` for the modifier and the injection
-mode, `InputDeviceStore` for the microphone, `ModelStore` for the active model id.
+A setting picked in the menu bar or the **settings window** that survives a
+restart, held in `UserDefaults` by one `*Store` type per concern — `SettingsStore`
+for the modifier, the injection mode, the overlay, output muting and the session
+history, `InputDeviceStore` for the microphone, `ModelStore` for the active model id.
 All resolve alike: the flag wins for the launch that passes it, else the remembered
 value, else the default. Note `ModelStore` the type is not the **Model store**
 below, which is a directory of weights.
 _Avoid_: config, preferences, config file (there is no file — see [ADR-0004](./docs/adr/0004-settings-in-userdefaults.md))
+
+**Settings window**:
+The five-section window — Home, Configuration, Sound, Models, History — opened
+from the menu bar or ⌘,. It exposes no capability the daemon did not already have;
+every control moves a remembered choice and every readout shows state the daemon
+already computes. Named for what `docs/architecture.md` calls it, not for the
+`preferences` its non-goals used — see [ADR-0007](./docs/adr/0007-a-settings-window-and-a-session-history.md).
+_Avoid_: preferences window, preferences panel, settings panel
+
+**Section**:
+One row of the settings window's sidebar and the pane it shows. Always one of the
+five; there is no sixth, because there is no sixth feature to put in one.
+_Avoid_: tab, page, pane
+
+**Daemon state**:
+`DaemonState` — the live state of a run (what the dictation is doing, which model
+is loaded, which switch is in flight) plus the remembered choices, held in one
+place because the menu bar and the settings window both read and write them. The
+menu bar used to hold this itself.
+_Avoid_: app state, view model, controller
+
+**Session history**:
+The finished dictations of the current daemon run, capped at 200 and held in RAM
+by `TranscriptHistory`. Cleared when the daemon restarts and never written to
+disk, which is what keeps the no-transcripts-on-disk promise true while the
+History section exists.
+_Avoid_: history log, transcript log, recents (the first two name a file, which
+this deliberately is not)
 
 ### Speech models
 

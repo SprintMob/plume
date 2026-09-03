@@ -69,6 +69,56 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.resolvedHotkey(flag: nil), .fn)
     }
 
+    // MARK: - The three that turned from flags into remembered choices
+
+    /// `--no-overlay` and `--mute-output` each reach in one direction only:
+    /// there is no `--overlay`, so a flag can silence the pill for a run but
+    /// never force it back on over a remembered "off".
+    func testTheFlagsOnlyReachOneWay() {
+        store.overlay = true
+        store.muteOutput = false
+
+        XCTAssertFalse(store.resolvedOverlay(disabledByFlag: true))
+        XCTAssertTrue(store.resolvedMuteOutput(forcedByFlag: true))
+
+        XCTAssertTrue(store.resolvedOverlay(disabledByFlag: false))
+        XCTAssertFalse(store.resolvedMuteOutput(forcedByFlag: false))
+    }
+
+    func testTheRememberedBoolWinsOverTheDefault() {
+        store.overlay = false
+        store.muteOutput = true
+        store.sessionHistory = false
+
+        XCTAssertFalse(store.resolvedOverlay(disabledByFlag: false))
+        XCTAssertTrue(store.resolvedMuteOutput(forcedByFlag: false))
+        XCTAssertFalse(store.resolvedSessionHistory())
+    }
+
+    func testTheBoolDefaultsAreOverlayOnMuteOffHistoryOn() {
+        XCTAssertNil(store.overlay)
+        XCTAssertNil(store.muteOutput)
+        XCTAssertNil(store.sessionHistory)
+
+        XCTAssertTrue(store.resolvedOverlay(disabledByFlag: false))
+        XCTAssertFalse(store.resolvedMuteOutput(forcedByFlag: false))
+        XCTAssertTrue(store.resolvedSessionHistory())
+    }
+
+    /// The reason these read through `object(forKey:)`: `bool(forKey:)` answers
+    /// `false` for a key nobody has written, which would make a remembered
+    /// "overlay off" indistinguishable from "never chosen" — and the default is
+    /// on.
+    func testChoosingOffIsNotTheSameAsNeverChoosing() {
+        store.overlay = false
+        XCTAssertEqual(store.overlay, false)
+
+        store.overlay = nil
+
+        XCTAssertNil(store.overlay)
+        XCTAssertTrue(store.resolvedOverlay(disabledByFlag: false))
+    }
+
     func testRoundTripsThroughASeparateInstance() {
         store.hotkey = .rightCommand
 

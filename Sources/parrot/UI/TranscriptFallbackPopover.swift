@@ -73,11 +73,6 @@ final class TranscriptFallbackPopover {
     }
 }
 
-private enum TranscriptFallbackStyle {
-    static let background = Color(red: 16/255, green: 18/255, blue: 18/255)
-    static let accent = Color(red: 181/255, green: 209/255, blue: 255/255)
-}
-
 private struct TranscriptFallbackView: View {
     let transcript: String
     let onCopy: () -> Void
@@ -88,7 +83,7 @@ private struct TranscriptFallbackView: View {
             HStack(spacing: 10) {
                 Image(systemName: "text.cursor")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(TranscriptFallbackStyle.accent)
+                    .foregroundStyle(Style.accent)
 
                 Text("No text field selected")
                     .font(.system(size: 13, weight: .semibold))
@@ -130,11 +125,11 @@ private struct TranscriptFallbackView: View {
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(TranscriptFallbackStyle.background)
+                .foregroundStyle(Style.background)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    TranscriptFallbackStyle.accent,
+                    Style.accent,
                     in: Capsule()
                 )
             }
@@ -143,7 +138,7 @@ private struct TranscriptFallbackView: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(TranscriptFallbackStyle.background)
+                .fill(Style.background)
         )
     }
 }

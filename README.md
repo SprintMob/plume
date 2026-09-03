@@ -25,6 +25,27 @@ The installer drops the binary in `/usr/local/bin/parrot`. Builds are unsigned f
 
 That's it. There is no record button, no stop button, no "send" — `fn` is the whole interface.
 
+## The settings window
+
+Everything above can be changed without a terminal. Open **Settings…** from the
+menu bar, or press ⌘, once parrot is in front.
+
+| Section | What's in it |
+|---|---|
+| **Home** | What parrot is doing, the active model, and the five `parrot doctor` checks with the fix for each |
+| **Configuration** | The dictation overlay, the hold-to-talk key, launch at login, injection mode, and whether to keep a session history |
+| **Sound** | Which microphone to use, and whether to mute system audio while dictating |
+| **Models** | Every model, its size, and whether it's downloaded — click one to switch |
+| **History** | What you've dictated since parrot started. Click an entry to copy it |
+
+The window is the same settings as the menu bar, not more: every control moves
+something the CLI flags already moved. While it's open parrot takes a dock icon,
+so ⌘C, ⌘V and ⌘W work; both go away when you close it.
+
+**The history is kept in memory only.** It holds the last 200 dictations of the
+current run, it is gone when parrot restarts, and it is never written to disk.
+Turn it off entirely under Configuration → Application.
+
 > **Note:** on most modern Macs the `fn` key is the bottom-left key. If yours is set to "Change input source" or "Show emoji & symbols," `parrot setup` will tell you how to flip it back to plain `fn`.
 
 ## CLI
@@ -61,7 +82,8 @@ parrot --hotkey left-option
 your keyboard actually emits. Note that it logs every key you press while it
 runs, so use it to identify a key and then stop it.
 
-You can also pick the key from the menu bar, under **Hold-to-talk key**. It takes
+You can also pick the key from the menu bar, under **Hold-to-talk key**, or in the
+settings window under Configuration. It takes
 effect immediately — no restart — and is remembered, so a daemonized install keeps
 it across logins without re-running `parrot install`. The flag stays useful for a
 one-off run: it sets the key for that launch without changing what you come back
@@ -69,7 +91,8 @@ to.
 
 ### Injection modes
 
-Also selectable from the menu bar under **Injection**, and remembered the same way.
+Also selectable from the menu bar under **Injection**, or in the settings window
+under Configuration → Application, and remembered the same way.
 
 Whichever you pick, the transcript goes to the clipboard first, every time —
 including when there is nowhere to inject it. It replaces what you had copied
@@ -89,6 +112,11 @@ it no longer does.
 `--mute-output` mutes the active macOS output for the duration of a recording
 and restores the previous mute or volume state when it stops, so a browser tab
 or Spotify is not playing into the microphone.
+
+It is a remembered choice, like `--no-overlay`: set it once in the settings window
+(Sound → Playback, and Configuration → Appearance for the overlay) and it sticks.
+Both flags only reach one way — there is no `--overlay` — so a flag can silence
+the pill for one run but never force it back on over a remembered "off".
 
 ## Privacy
 
@@ -121,6 +149,7 @@ Either way the log holds no transcript text.
 - **CGEventTap** — global hotkey
 - **CGEvent** — text injection at cursor
 - **NSWindow** (borderless, click-through) — recording-indicator pill
+- **SwiftUI + NSHostingController** — the settings window
 
 See [docs/architecture.md](docs/architecture.md) for design notes.
 

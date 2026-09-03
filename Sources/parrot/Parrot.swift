@@ -72,8 +72,9 @@ struct Run: ParsableCommand {
         name: .long,
         help: ArgumentHelp(
             "How the transcript is delivered to the focused app.",
-            discussion: "paste briefly uses the pasteboard and works in terminals and Electron "
-                + "apps; type-unicode leaves the pasteboard untouched but is dropped by some apps."
+            discussion: "paste sends ⌘V and lets the app read the pasteboard, which works in "
+                + "terminals and Electron apps; type-unicode types the characters instead, and is "
+                + "dropped by some apps. Either way the transcript is left on the pasteboard."
                 + " Defaults to whatever was last chosen in the menu bar, else paste."
         ))
     var injectMode: TextInjector.Mode?
@@ -144,35 +145,56 @@ struct Run: ParsableCommand {
         let monitor = HotkeyMonitor(hotkey: hotkey, debug: debugHotkey)
         let devices = InputDeviceStore()
         let capture = AudioCapture()
-        let outputMute = muteOutput ? OutputMuteController() : nil
+        // Built whatever the flags said: both are remembered choices now, and
+        // the settings window can turn either on mid-run. The mute controller
+        // holds nothing until it mutes, and the overlay no window until it
+        // shows, so building them unused costs nothing.
+        let outputMute = OutputMuteController()
         let dumpWav = self.dumpWav
         let echoTranscripts = self.echoTranscripts
         let debugFocus = self.debugFocus
         let wakeAccessibility = !self.noWakeAccessibility
-        let overlay: RecordingOverlay? = noOverlay ? nil : MainActor.assumeIsolated { RecordingOverlay() }
-        if let overlay {
-            capture.onLevel = { level in overlay.pushLevel(level) }
+        let overlay = MainActor.assumeIsolated { RecordingOverlay() }
+        capture.onLevel = { level in overlay.pushLevel(level) }
+
+        let state = MainActor.assumeIsolated {
+            DaemonState(
+                model: chosenModel,
+                hotkey: hotkey,
+                injectMode: injectMode,
+                overlayEnabled: settings.resolvedOverlay(disabledByFlag: noOverlay),
+                muteOutputEnabled: settings.resolvedMuteOutput(forcedByFlag: muteOutput),
+                sessionHistoryEnabled: settings.resolvedSessionHistory(),
+                settings: settings)
         }
+        let history = MainActor.assumeIsolated { TranscriptHistory() }
         let menuBar = MainActor.assumeIsolated {
-            MenuBarController(model: chosenModel, hotkeyLabel: hotkey.rawValue, devices: devices)
+            MenuBarController(state: state, devices: devices)
+        }
+        let settingsWindow = MainActor.assumeIsolated {
+            SettingsWindowController(state: state, devices: devices, history: history)
         }
         let fallbackPopover = MainActor.assumeIsolated { TranscriptFallbackPopover() }
         MainActor.assumeIsolated {
-            menuBar.onModel = { [weak menuBar] next in
+            menuBar.onOpenSettings = { settingsWindow.show() }
+            // No load to wait on, unlike a model switch: tell the tap and the
+            // state has already recorded the choice.
+            state.onHotkey = { monitor.setHotkey($0) }
+            state.onModel = { [weak state] next in
                 Task {
                     do {
                         let outgoing = try await transcriber.use(next) { fraction in
-                            Task { @MainActor in menuBar?.setSwitchProgress(fraction) }
+                            Task { @MainActor in state?.switchProgressed(fraction) }
                         }
                         // Only now: a model that failed to load is not what the
                         // daemon should come back as after a restart.
                         models.selectedID = next.id
                         models.previousID = outgoing?.id
                         reclaim(ModelWeights.purge(keeping: [next, outgoing].compactMap { $0 }))
-                        await MainActor.run { menuBar?.setModel(next) }
+                        await MainActor.run { state?.switched(to: next) }
                     } catch {
                         FileHandle.standardError.write(Data("switch to \(next.id) failed: \(error)\n".utf8))
-                        await MainActor.run { menuBar?.setModelFailed(next) }
+                        await MainActor.run { state?.switchFailed(next) }
                     }
                 }
             }
@@ -186,18 +208,21 @@ struct Run: ParsableCommand {
             if wakeAccessibility {
                 MainActor.assumeIsolated { _ = AccessibilityOptIn.wakeFocusedApp() }
             }
-            outputMute?.mute()
+            // Read per dictation rather than captured at launch: the window can
+            // flip either between one dictation and the next.
+            let muting = MainActor.assumeIsolated { state.muteOutputEnabled }
+            if muting { outputMute.mute() }
             do {
                 try capture.start(device: devices.resolved()?.id)
                 FileHandle.standardError.write(Data("● recording\n".utf8))
                 MainActor.assumeIsolated {
                     fallbackPopover.hide()
-                    overlay?.show(.recording)
-                    menuBar.setRecording(true)
+                    if state.overlayEnabled { overlay.show(.recording) }
+                    state.setDictation(.recording)
                 }
                 return true
             } catch {
-                outputMute?.restore()
+                outputMute.restore()
                 FileHandle.standardError.write(Data("capture failed: \(error)\n".utf8))
                 return false
             }
@@ -205,10 +230,12 @@ struct Run: ParsableCommand {
 
         func finishRecording() {
             let samples = capture.stop()
-            outputMute?.restore()
+            // Unconditional, and safe when nothing was muted — which also
+            // covers muting being switched off mid-dictation.
+            outputMute.restore()
             MainActor.assumeIsolated {
-                overlay?.show(.transcribing)
-                menuBar.setTranscribing()
+                if state.overlayEnabled { overlay.show(.transcribing) }
+                state.setDictation(.transcribing)
             }
             let seconds = Double(samples.count) / AudioCapture.targetSampleRate
             let rms = computeRMS(samples)
@@ -226,8 +253,8 @@ struct Run: ParsableCommand {
             }
             guard !samples.isEmpty else {
                 MainActor.assumeIsolated {
-                    overlay?.hide()
-                    menuBar.setRecording(false)
+                    overlay.hide()
+                    state.setDictation(.idle)
                 }
                 return
             }
@@ -241,8 +268,8 @@ struct Run: ParsableCommand {
                         : String(format: "→ %.2fs · %ld chars\n", elapsed, text.count)
                     FileHandle.standardError.write(Data(line.utf8))
                     await MainActor.run {
-                        overlay?.hide()
-                        menuBar.setRecording(false)
+                        overlay.hide()
+                        state.setDictation(.idle)
                         // Before anything that can hang or refuse: the probe
                         // below spends up to 0.6s in the accessibility API,
                         // twice, on an app that may never answer. Whatever
@@ -250,6 +277,13 @@ struct Run: ParsableCommand {
                         // pasteboard. Empty text is left alone in there, which
                         // is why this can run before the guard.
                         TextInjector.copyToPasteboard(text)
+                        // Recorded here for the same reason, and empty too: a
+                        // dictation that produced nothing is still something
+                        // the user did and wants explained. In memory only —
+                        // see ADR-0007.
+                        if state.sessionHistoryEnabled {
+                            history.record(text, latency: elapsed)
+                        }
                     }
                     guard !text.isEmpty else { return }
 
@@ -274,16 +308,18 @@ struct Run: ParsableCommand {
                                 Data(resolved.debugLine(retried: retry).utf8))
                         }
                         if resolved.isEditable {
-                            TextInjector.inject(text, mode: injectMode)
+                            TextInjector.inject(text, mode: state.injectMode)
                         } else {
+                            // Already on the pasteboard; the panel is only how
+                            // the user finds out that is where it went.
                             fallbackPopover.show(text)
                         }
                     }
                 } catch {
                     FileHandle.standardError.write(Data("transcription failed: \(error)\n".utf8))
                     await MainActor.run {
-                        overlay?.hide()
-                        menuBar.setRecording(false)
+                        overlay.hide()
+                        state.setDictation(.idle)
                     }
                 }
             }
@@ -299,9 +335,9 @@ struct Run: ParsableCommand {
                 stopRecording: finishRecording,
                 showLocked: {
                     FileHandle.standardError.write(
-                        Data("🔒 recording locked · tap \(hotkey.rawValue) to stop\n".utf8))
-                    overlay?.show(.locked)
-                    menuBar.setLockedRecording()
+                        Data("🔒 recording locked · tap \(state.hotkey.rawValue) to stop\n".utf8))
+                    if state.overlayEnabled { overlay.show(.locked) }
+                    state.setDictation(.locked)
                 }
             )
         }
@@ -325,7 +361,7 @@ struct Run: ParsableCommand {
                 gestureController.cancel()
             }
             _ = capture.stop()
-            outputMute?.restore()
+            outputMute.restore()
         }
         let terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
