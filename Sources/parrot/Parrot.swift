@@ -34,6 +34,20 @@ struct Run: ParsableCommand {
     @Flag(name: .long, help: "Print the full transcript text to stderr. The text of everything you dictate will appear in logs.")
     var echoTranscripts: Bool = false
 
+    @Flag(name: .long, help: "Print what the accessibility API reports about the focused element on each dictation (debug).")
+    var debugFocus: Bool = false
+
+    @Flag(
+        name: .long,
+        help: ArgumentHelp(
+            "Never ask apps to switch their accessibility tree on.",
+            discussion: "Chromium and Electron apps keep that tree off until an assistive "
+                + "technology asks for it, and their text fields are invisible to parrot until "
+                + "they do. Pass this to stop asking; dictation into a browser will then fall "
+                + "back to the transcript popover."
+        ))
+    var noWakeAccessibility: Bool = false
+
     @Flag(name: .long, help: "Disable the on-screen recording overlay.")
     var noOverlay: Bool = false
 
@@ -125,6 +139,8 @@ struct Run: ParsableCommand {
         let outputMute = muteOutput ? OutputMuteController() : nil
         let dumpWav = self.dumpWav
         let echoTranscripts = self.echoTranscripts
+        let debugFocus = self.debugFocus
+        let wakeAccessibility = !self.noWakeAccessibility
         let overlay: RecordingOverlay? = noOverlay ? nil : MainActor.assumeIsolated { RecordingOverlay() }
         if let overlay {
             capture.onLevel = { level in overlay.pushLevel(level) }
@@ -155,6 +171,13 @@ struct Run: ParsableCommand {
         }
 
         func beginRecording() -> Bool {
+            // Chromium and Electron apps only build their accessibility tree
+            // once an assistive technology asks. Ask at the start of the
+            // dictation, so the tree is ready by the time — a second or more
+            // from now — the transcript needs somewhere to land.
+            if wakeAccessibility {
+                MainActor.assumeIsolated { _ = AccessibilityOptIn.wakeFocusedApp() }
+            }
             outputMute?.mute()
             do {
                 try capture.start(device: devices.resolved()?.id)
@@ -212,8 +235,30 @@ struct Run: ParsableCommand {
                     await MainActor.run {
                         overlay?.hide()
                         menuBar.setRecording(false)
-                        guard !text.isEmpty else { return }
-                        if FocusedTextTarget.isEditable {
+                    }
+                    guard !text.isEmpty else { return }
+
+                    var probe = await MainActor.run { FocusedTextTarget.probe() }
+                    // A tree woken only moments ago may still be building, and
+                    // Chromium lets its own lapse when no assistive technology
+                    // has been about. One more ask, one beat, one more look —
+                    // but never for a password box, where the refusal is the
+                    // point.
+                    let retry = !probe.isEditable && probe.outcome != .secureField
+                        && wakeAccessibility
+                    if retry {
+                        await MainActor.run { _ = AccessibilityOptIn.wakeFocusedApp(force: true) }
+                        try? await Task.sleep(nanoseconds: 120_000_000)
+                        probe = await MainActor.run { FocusedTextTarget.probe() }
+                    }
+
+                    let resolved = probe
+                    await MainActor.run {
+                        if debugFocus {
+                            FileHandle.standardError.write(
+                                Data(resolved.debugLine(retried: retry).utf8))
+                        }
+                        if resolved.isEditable {
                             TextInjector.inject(text, mode: injectMode)
                         } else {
                             fallbackPopover.show(text)

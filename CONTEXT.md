@@ -65,6 +65,22 @@ inject text. Nothing else in the app touches keyboard events.
 Two event taps live at once competing over the same events, which is how injected
 text ends up duplicated or dropped.
 
+**Focus probe**:
+The accessibility-API read deciding whether text injection has anywhere to land —
+is the focused element editable, and is it a password box. Its answer picks between
+injection and the transcript fallback.
+_Avoid_: focus check, AX check (the probe is a walk over several elements, not one
+attribute read)
+
+**Accessibility opt-in**:
+The handshake that makes an app expose its accessibility tree at all: Chromium
+watches for `AXEnhancedUserInterface`, Electron for `AXManualAccessibility`. Both
+keep that tree off until an assistive technology asks, so without the opt-in the
+focus probe is blind to every browser text field — see
+[ADR-0005](./docs/adr/0005-wake-chromium-accessibility.md).
+_Avoid_: enabling accessibility (that names the permission macOS grants parrot,
+which is a different thing entirely)
+
 **Launch agent**:
 The per-user `com.digimata.parrot` job that keeps the daemon running at login. Its
 `KeepAlive` policy is what turns a warmup failure into a relaunch loop.

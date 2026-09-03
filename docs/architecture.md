@@ -103,6 +103,12 @@ Adding an engine = one new file conforming to `Transcriber`.
 
 `CGEventCreateKeyboardEvent` + `CGEventKeyboardSetUnicodeString` — pastes the transcript at the current cursor position. Works in nearly every text field on macOS (some Electron apps and secure fields are flaky; platform constraint).
 
+### `FocusedTextTarget` and `AccessibilityOptIn`
+
+The focus probe. `FocusedTextTarget.probe()` reads the system-wide focused element and walks up to 6 ancestors and 96 descendants asking whether any of them can take text, under a 0.6 s budget so a slow app cannot block the main actor. A secure field is refused outright — a transcript must never be delivered into a password box. `FocusRules` holds the decision as a pure function over `ElementFacts`, which is where its tests live.
+
+`AccessibilityOptIn` is what makes the probe work in a browser. Chromium and Electron apps keep their accessibility tree off until an assistive technology asks, so parrot asks — `AXEnhancedUserInterface` and `AXManualAccessibility` on the focused app, as each dictation starts. See [ADR-0005](./adr/0005-wake-chromium-accessibility.md); `--no-wake-accessibility` turns it off, `--debug-focus` reports what the probe saw.
+
 ### `RecordingOverlay`
 
 A single borderless `NSWindow` displayed at the bottom-center of the active screen while recording. Provides visual feedback that the mic is hot — the only piece of UI in the app.
@@ -248,6 +254,8 @@ parrot/
     Input/
       HotkeyMonitor.swift       # CGEventTap
       TextInjector.swift        # CGEvent posting
+      FocusedTextTarget.swift   # the focus probe
+      AccessibilityOptIn.swift  # wakes Chromium/Electron a11y trees
 
     UI/
       RecordingOverlay.swift    # borderless NSWindow + SwiftUI pill
