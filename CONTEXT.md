@@ -1,4 +1,4 @@
-# Parrot
+# Plume
 
 Fork of [`digimata/parrot`](https://github.com/digimata/parrot), a macOS dictation
 daemon: hold a key, speak, and the transcribed text is inserted into whatever app
@@ -32,7 +32,7 @@ or by pasting what the pasteboard guarantee has already written.
 _Avoid_: paste, typing, output (each names one implementation of it)
 
 **Doctor**:
-The built-in self-check (`parrot doctor`) reporting whether permissions, models and
+The built-in self-check (`plume doctor`) reporting whether permissions, models and
 the launch agent are in a usable state.
 
 **Remembered choice**:
@@ -96,7 +96,7 @@ _Avoid_: missing, corrupted, evicted
 ### The macOS substrate
 
 **Event tap**:
-A `CGEventTap` — the mechanism parrot uses both to observe the trigger key and to
+A `CGEventTap` — the mechanism plume uses both to observe the trigger key and to
 inject text. Nothing else in the app touches keyboard events.
 
 **Tap collision**:
@@ -116,11 +116,11 @@ watches for `AXEnhancedUserInterface`, Electron for `AXManualAccessibility`. Bot
 keep that tree off until an assistive technology asks, so without the opt-in the
 focus probe is blind to every browser text field — see
 [ADR-0005](./docs/adr/0005-wake-chromium-accessibility.md).
-_Avoid_: enabling accessibility (that names the permission macOS grants parrot,
+_Avoid_: enabling accessibility (that names the permission macOS grants plume,
 which is a different thing entirely)
 
 **Pasteboard guarantee**:
-Every non-empty transcript is written to the pasteboard before parrot does anything
+Every non-empty transcript is written to the pasteboard before plume does anything
 else with it, so a dictation survives a focus probe that hangs, a password box, and
 an app that drops synthesized keystrokes. Unconditional, in both injection modes,
 and it replaces what was copied before without putting it back — see

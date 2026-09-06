@@ -35,19 +35,19 @@ jobs:
 
       - name: stage
         run: |
-          BIN=.build/arm64-apple-macosx/release/parrot
+          BIN=.build/arm64-apple-macosx/release/plume
           file "$BIN"
           mkdir -p dist
-          cp "$BIN" dist/parrot
+          cp "$BIN" dist/plume
 
       - name: strip
-        run: strip -x dist/parrot
+        run: strip -x dist/plume
 
       - name: package
         run: |
           cd dist
-          tar -czf parrot-macos-arm64.tar.gz parrot
-          shasum -a 256 parrot-macos-arm64.tar.gz > parrot-macos-arm64.tar.gz.sha256
+          tar -czf plume-macos-arm64.tar.gz plume
+          shasum -a 256 plume-macos-arm64.tar.gz > plume-macos-arm64.tar.gz.sha256
           ls -lh
 
       - name: release
@@ -55,7 +55,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            dist/parrot-macos-arm64.tar.gz
-            dist/parrot-macos-arm64.tar.gz.sha256
+            dist/plume-macos-arm64.tar.gz
+            dist/plume-macos-arm64.tar.gz.sha256
           generate_release_notes: true
           fail_on_unmatched_files: true

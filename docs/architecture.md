@@ -30,9 +30,9 @@ The binary is a Swift Package executable — `swift build`, `swift run`, ship a 
 ## High-level shape
 
 ```
-$ parrot
+$ plume
                                     ┌──────────────────┐
-                                    │   ParrotCLI      │
+                                    │   PlumeCLI      │
                                     │   (main.swift)   │
                                     └────────┬─────────┘
                                              │ wires modules, runs RunLoop
@@ -63,21 +63,21 @@ $ parrot
 
 ## Modules
 
-### `main.swift` (ParrotCLI)
+### `main.swift` (PlumeCLI)
 
 Argument parsing (via `swift-argument-parser`), config loading, module wiring. Calls `NSApplication.shared.setActivationPolicy(.accessory)` so the process has no dock icon and no menu bar entry, then runs `NSApp.run()` to keep the process alive and drive the AppKit run loop (needed for `NSWindow`, `CGEventTap`, and AVFoundation). Exits cleanly on SIGINT. Logs status to stderr so a user running it in a terminal can see what's happening.
 
 Subcommands:
-- `parrot` (default) — run the daemon
-- `parrot models list` — show registered models, mark which are downloaded
-- `parrot models download <id>` — pre-fetch a model
-- `parrot doctor` — check microphone and accessibility permissions, print remediation steps
+- `plume` (default) — run the daemon
+- `plume models list` — show registered models, mark which are downloaded
+- `plume models download <id>` — pre-fetch a model
+- `plume doctor` — check microphone and accessibility permissions, print remediation steps
 
 ### `HotkeyMonitor`
 
 Global hotkey via `CGEventTap` (requires Accessibility permission). Default: **hold Fn**. Detected via `flagsChanged` events with `NSEvent.ModifierFlags.function` / `kCGEventFlagMaskSecondaryFn`. Emits `.pressed` / `.released` / `.interrupted`. Configurable via the `--hotkey` flag or the menu bar, which swaps the watched modifier in place — the tap already sees every `flagsChanged` event, so only the comparison changes and nothing is rebuilt.
 
-**Fn key caveat:** macOS by default maps the Fn (🌐) key to "Show Emoji & Symbols" or "Start Dictation" depending on the user's setting in System Settings → Keyboard → Press 🌐 key to. The CGEventTap sees the keypress regardless, but the system action also fires. `parrot doctor` will detect this setting and instruct the user to change it to "Do Nothing" so Fn becomes a clean modifier.
+**Fn key caveat:** macOS by default maps the Fn (🌐) key to "Show Emoji & Symbols" or "Start Dictation" depending on the user's setting in System Settings → Keyboard → Press 🌐 key to. The CGEventTap sees the keypress regardless, but the system action also fires. `plume doctor` will detect this setting and instruct the user to change it to "Do Nothing" so Fn becomes a clean modifier.
 
 ### `AudioCapture`
 
@@ -114,7 +114,7 @@ How the transcript is then delivered to the focused app is picked from the menu 
 
 The focus probe. `FocusedTextTarget.probe()` reads the system-wide focused element and walks up to 6 ancestors and 96 descendants asking whether any of them can take text, under a 0.6 s budget so a slow app cannot block the main actor. A secure field is refused outright — a transcript must never be delivered into a password box. `FocusRules` holds the decision as a pure function over `ElementFacts`, which is where its tests live.
 
-`AccessibilityOptIn` is what makes the probe work in a browser. Chromium and Electron apps keep their accessibility tree off until an assistive technology asks, so parrot asks — `AXEnhancedUserInterface` and `AXManualAccessibility` on the focused app, as each dictation starts. See [ADR-0005](./adr/0005-wake-chromium-accessibility.md); `--no-wake-accessibility` turns it off, `--debug-focus` reports what the probe saw.
+`AccessibilityOptIn` is what makes the probe work in a browser. Chromium and Electron apps keep their accessibility tree off until an assistive technology asks, so plume asks — `AXEnhancedUserInterface` and `AXManualAccessibility` on the focused app, as each dictation starts. See [ADR-0005](./adr/0005-wake-chromium-accessibility.md); `--no-wake-accessibility` turns it off, `--debug-focus` reports what the probe saw.
 
 ### `TranscriptFallbackPopover`
 
@@ -161,11 +161,11 @@ enum Engine: String, Codable { case whisperKit, parakeet }
 
 Backed by a bundled `models.json` resource. Adding a model = appending an entry. Adding an engine = one new `Transcriber` conformance + one entry in the `Engine` enum.
 
-The registry is the single source of truth for: download URLs, file names, sizes, recommended flags, what shows up in `parrot models list`.
+The registry is the single source of truth for: download URLs, file names, sizes, recommended flags, what shows up in `plume models list`.
 
 ### `ModelDownloader`
 
-On first selection (or via `parrot models download <id>`), downloads to `~/Library/Application Support/parrot/models/<engine>/<id>/`. Progress bar to stderr (using `\r` overwrites). Resumable, validates size. Refuses to start the daemon if the selected model isn't present.
+On first selection (or via `plume models download <id>`), downloads to `~/Library/Application Support/plume/models/<engine>/<id>/`. Progress bar to stderr (using `\r` overwrites). Resumable, validates size. Refuses to start the daemon if the selected model isn't present.
 
 ### Settings
 
@@ -181,7 +181,7 @@ than failing the launch.
 | `SettingsStore` | `hotkey`, `injectMode` | menu bar → Hold-to-talk key, Injection · window → Configuration |
 | `SettingsStore` | `overlay`, `muteOutput`, `sessionHistory` | window → Configuration, Sound |
 
-The TOML file at `~/.config/parrot/config.toml` this section used to specify was
+The TOML file at `~/.config/plume/config.toml` this section used to specify was
 never built; see [ADR-0004](./adr/0004-settings-in-userdefaults.md) for why the
 merge queue settled on `UserDefaults` instead. The launch agent deliberately bakes
 none of these into its `ProgramArguments`, since a flag there would override the
@@ -200,20 +200,20 @@ between.
 
 ## Permissions
 
-Two prompts on first run, both surfaced via `parrot doctor`:
+Two prompts on first run, both surfaced via `plume doctor`:
 
 1. **Microphone** — standard `AVCaptureDevice` request, fires on first audio engine start.
-2. **Accessibility** — required for `CGEventTap` (hotkey) and `CGEvent` posting (text injection). User toggles in System Settings → Privacy & Security → Accessibility, granting the *terminal* (or whatever launched parrot) permission, since the binary inherits its parent's TCC identity.
+2. **Accessibility** — required for `CGEventTap` (hotkey) and `CGEvent` posting (text injection). User toggles in System Settings → Privacy & Security → Accessibility, granting the *terminal* (or whatever launched plume) permission, since the binary inherits its parent's TCC identity.
 
-`parrot doctor` checks both and prints actionable next steps if either is missing. Without these, the daemon refuses to start.
+`plume doctor` checks both and prints actionable next steps if either is missing. Without these, the daemon refuses to start.
 
 ### TCC quirk worth knowing
 
-When you launch `parrot` from `Terminal.app`, accessibility permission is granted to *Terminal*, not parrot itself. This means:
+When you launch `plume` from `Terminal.app`, accessibility permission is granted to *Terminal*, not plume itself. This means:
 - Switching terminals (Terminal → iTerm → Ghostty) requires re-granting permission.
 - Running under `launchd` requires granting permission to whatever spawns it.
 
-This is a macOS platform behavior, not a parrot bug. `parrot doctor` will identify the parent process and tell the user which app needs the permission.
+This is a macOS platform behavior, not a plume bug. `plume doctor` will identify the parent process and tell the user which app needs the permission.
 
 ## Models — what ships
 
@@ -225,12 +225,12 @@ Initial registry:
 | WhisperKit | `whisper-large-v3-turbo` | ~800 MB | Recommended for daily use |
 | Parakeet | `parakeet-tdt-0.6b-v3` | ~600 MB | English, fastest on ANE |
 
-Models live in `~/Library/Application Support/parrot/models/`. Not bundled — fetched on first selection or via `parrot models download`.
+Models live in `~/Library/Application Support/plume/models/`. Not bundled — fetched on first selection or via `plume models download`.
 
 ## Data flow, end-to-end
 
-1. User runs `parrot` in a terminal.
-2. `ParrotCLI` validates permissions (`parrot doctor` logic), loads config, instantiates modules.
+1. User runs `plume` in a terminal.
+2. `PlumeCLI` validates permissions (`plume doctor` logic), loads config, instantiates modules.
 3. Sets `.accessory` activation policy and enters `NSApp.run()`. Status: `listening`. Overlay hidden.
 4. User holds Fn.
 5. `HotkeyMonitor` fires `.pressed`. `RecordingOverlay` shows. Status: `recording`.
@@ -250,7 +250,7 @@ End-to-end latency target: <500 ms after hotkey release for utterances under 10 
 
 - No streaming partial transcripts in v1. Press, speak, release, get full text.
 - No VAD-based hands-free mode. Push-to-talk is more reliable and uses zero idle CPU.
-- No transcript log and no clipboard manager. Nothing parrot produces is written to disk. Output goes to the cursor, and to the pasteboard on the way — one entry, overwritten every dictation. Finished dictations are also kept in a capped in-memory buffer for the life of the daemon run, which the window's History section reads and a switch turns off. (This bullet originally ruled out the pasteboard as an output at all, and then ruled out any history. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
+- No transcript log and no clipboard manager. Nothing plume produces is written to disk. Output goes to the cursor, and to the pasteboard on the way — one entry, overwritten every dictation. Finished dictations are also kept in a capped in-memory buffer for the life of the daemon run, which the window's History section reads and a switch turns off. (This bullet originally ruled out the pasteboard as an output at all, and then ruled out any history. See [ADR-0006](./adr/0006-transcript-always-on-the-pasteboard.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
 - No custom vocabulary, prompts, or post-processing.
 - ~~No settings window and no preferences panel.~~ Configuration is flags, the menu bar, and a settings window with five sections — Home, Configuration, Sound, Models, History — reachable from the menu bar and from ⌘,. The window exposes no capability the daemon did not already have. (This bullet originally ruled out the menu bar too; waves 2 and 3 merged it, and the window followed. See [ADR-0004](./adr/0004-settings-in-userdefaults.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
 
@@ -261,9 +261,9 @@ These are deliberate cuts. Each can be revisited if real usage demands it.
 Organized by feature area. These are folders within a single SPM executable target — Swift sees them as one module, but the directory grouping keeps related code together. If a group later earns its keep as a reusable library (e.g. `Transcription` consumed by another tool), it can be promoted to its own SPM target with no rewriting.
 
 ```
-parrot/
+plume/
   Package.swift                 # SPM, single executable target
-  Sources/parrot/
+  Sources/plume/
     main.swift                  # entry point, argument parsing, NSApp.run()
     SettingsStore.swift
     Doctor.swift
@@ -293,12 +293,12 @@ parrot/
       MenuBarController.swift       # NSStatusItem and its menu
       TranscriptFallbackPopover.swift  # transcript fallback panel
       DaemonState.swift             # live state + remembered choices, read by both surfaces
-      Style.swift                   # the two colours parrot paints its own chrome in
+      Style.swift                   # the two colours plume paints its own chrome in
       Settings/                     # the settings window
         SettingsWindowController.swift  # NSWindow + main menu + .regular/.accessory
         SettingsRootView.swift          # sidebar and section routing
         SettingsControls.swift          # page, group, row, key cap
-        HomeSection.swift               # doctor checks and what parrot is doing
+        HomeSection.swift               # doctor checks and what plume is doing
         ConfigurationSection.swift      # overlay, hotkey, launch agent, injection
         SoundSection.swift              # microphone, system audio while dictating
         ModelsSection.swift             # the registry as a table
@@ -311,15 +311,15 @@ parrot/
   README.md
 ```
 
-Build: `swift build -c release`. Resulting binary at `.build/release/parrot`. Install: copy to `~/.local/bin/` or `/usr/local/bin/`.
+Build: `swift build -c release`. Resulting binary at `.build/release/plume`. Install: copy to `~/.local/bin/` or `/usr/local/bin/`.
 
 ### On Swift "modules"
 
-Swift's module unit is the **SPM target** (one target = one module = one `import` namespace). For parrot v1 we use a single executable target with the folder structure above; everything is in the same module so no `import` statements between files. If we ever want enforced boundaries (e.g. `Transcription` and `UI` shouldn't reach into `Audio` internals), we promote folders to separate targets in `Package.swift` — a structural change, not a semantic one.
+Swift's module unit is the **SPM target** (one target = one module = one `import` namespace). For plume v1 we use a single executable target with the folder structure above; everything is in the same module so no `import` statements between files. If we ever want enforced boundaries (e.g. `Transcription` and `UI` shouldn't reach into `Audio` internals), we promote folders to separate targets in `Package.swift` — a structural change, not a semantic one.
 
 ## Open questions
 
 - **Parakeet via FluidAudio vs. direct CoreML?** FluidAudio is faster to integrate but adds a dependency. Decide once we benchmark both.
 - **Hotkey conflicts.** Right-Option is unused on most keyboards but some users remap it. Print a clear error if `CGEventTap` registration fails.
-- **First-run UX.** Bundle `whisper-base.en` so `parrot` works out of the box, or always require an explicit download? Probably the latter — keeps the binary small and the model directory clean.
+- **First-run UX.** Bundle `whisper-base.en` so `plume` works out of the box, or always require an explicit download? Probably the latter — keeps the binary small and the model directory clean.
 - **Code signing.** A self-built unsigned binary works fine locally but accessibility permission persistence is more reliable for signed binaries. Decide if we sign for personal distribution.

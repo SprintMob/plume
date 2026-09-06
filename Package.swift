@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "parrot",
+    name: "plume",
     platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
@@ -16,7 +16,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "parrot",
+            name: "plume",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "WhisperKit", package: "argmax-oss-swift"),
@@ -24,8 +24,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "parrotTests",
-            dependencies: ["parrot"]
+            name: "plumeTests",
+            dependencies: ["plume"]
         ),
     ]
 )
