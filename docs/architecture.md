@@ -2,7 +2,7 @@
 
 ## Goals
 
-1. **CLI executable.** Single binary, launched from the terminal. (The menu bar arrived in wave 3 and the settings window with it; the dock icon appears only while that window is open. See [ADR-0004](./adr/0004-settings-in-userdefaults.md) and [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md).)
+1. **CLI executable.** ~~Single binary, launched from the terminal.~~ The menu bar arrived in wave 3 and the settings window with it; the dock icon appears only while that window is open; and the daemon now ships inside `Plume.app` with `/usr/local/bin/plume` as a shim into it. The bundle is for TCC, not for looks: unbundled, the Accessibility grant attaches to whichever terminal launched the daemon. See [ADR-0004](./adr/0004-settings-in-userdefaults.md), [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md) and [ADR-0008](./adr/0008-ship-a-real-app-bundle.md).
 2. **Push-to-talk.** Hold Fn, speak, release — transcript appears at the cursor.
 3. **Minimal recording feedback.** A small floating pill at the bottom of the screen while recording, so the user knows the mic is hot. Click-through, borderless, hidden when idle.
 4. **On-device.** No network calls for transcription. Audio never leaves the machine.
@@ -25,7 +25,7 @@
 - **Permissions plumbing** (microphone, accessibility) is dramatically smoother in a Swift binary than via Rust crates.
 - **AppKit overlay for free.** The recording indicator (see below) is a borderless `NSWindow` — trivial in Swift, awkward in Rust.
 
-The binary is a Swift Package executable — `swift build`, `swift run`, ship a single binary. Even with the overlay window, there is no `.app` bundle, no menubar entry, no dock icon.
+The binary is a Swift Package executable — `swift build`, `swift run`. It is then assembled into `Plume.app` by `scripts/bundle.sh`, with no Xcode project and no `.xcodeproj` anywhere: a plist template, a directory layout and `codesign`. ~~Even with the overlay window, there is no `.app` bundle, no menubar entry, no dock icon.~~ All three clauses are now false; see [ADR-0008](./adr/0008-ship-a-real-app-bundle.md).
 
 ## High-level shape
 
@@ -203,17 +203,15 @@ between.
 Two prompts on first run, both surfaced via `plume doctor`:
 
 1. **Microphone** — standard `AVCaptureDevice` request, fires on first audio engine start.
-2. **Accessibility** — required for `CGEventTap` (hotkey) and `CGEvent` posting (text injection). User toggles in System Settings → Privacy & Security → Accessibility, granting the *terminal* (or whatever launched plume) permission, since the binary inherits its parent's TCC identity.
+2. **Accessibility** — required for `CGEventTap` (hotkey) and `CGEvent` posting (text injection). User toggles in System Settings → Privacy & Security → Accessibility, granting **Plume** permission. Before the `.app` bundle, the grant went to the *terminal* that launched the daemon, since a bare binary inherits its parent's TCC identity.
 
 `plume doctor` checks both and prints actionable next steps if either is missing. Without these, the daemon refuses to start.
 
-### TCC quirk worth knowing
+### The TCC quirk the bundle removed
 
-When you launch `plume` from `Terminal.app`, accessibility permission is granted to *Terminal*, not plume itself. This means:
-- Switching terminals (Terminal → iTerm → Ghostty) requires re-granting permission.
-- Running under `launchd` requires granting permission to whatever spawns it.
+This section used to read: launching `plume` from `Terminal.app` granted accessibility to *Terminal*, not to plume, so switching terminals meant re-granting, and running under `launchd` meant granting to whatever spawned it. It was never a plume bug: a bare binary has no identity of its own, so macOS attributed the request to the process that did.
 
-This is a macOS platform behavior, not a plume bug. `plume doctor` will identify the parent process and tell the user which app needs the permission.
+`Plume.app` has a stable `CFBundleIdentifier`, so the grant attaches to Plume and survives a change of terminal. What remains, until there is a Developer ID certificate, is that an ad-hoc signature anchors the requirement on the build's `cdhash`, so each release reads as a different application and costs the grant once. `plume doctor` says so when it happens. See [ADR-0008](./adr/0008-ship-a-real-app-bundle.md).
 
 ## Models — what ships
 

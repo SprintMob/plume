@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build, sign and install plume locally.
+# Build, sign and install Plume locally.
 #
 # The signing step is what keeps macOS from asking for Accessibility again on
 # every rebuild: an adhoc/linker signature has no certificate, so TCC anchors the
 # grant to the binary's cdhash and a rebuild invalidates it. Signed with a stable
 # identity, the designated requirement becomes
-#   identifier "plume" and certificate leaf = H"..."
+#   identifier "com.sprintmob.plume" and certificate leaf = H"..."
 # which every later build satisfies.
 #
 # The identity is a self-signed code-signing certificate in the login keychain,
@@ -23,12 +23,19 @@
 #
 # The legacy PKCS#12 algorithms are required: OpenSSL 3 defaults produce a file
 # the macOS Security framework cannot read.
+#
+# Since the daemon moved into a .app bundle, this installs three things rather
+# than one: ~/Applications/Plume.app, the /usr/local/bin/plume shim, and a
+# re-bootstrapped launch agent. ~/Applications rather than /Applications so a
+# rebuild needs no sudo.
 
 set -euo pipefail
-
-TARGET="${PLUME_INSTALL_PATH:-/usr/local/bin/plume}"
-LABEL="com.digimata.parrot"
 cd "$(dirname "$0")/.."
+# shellcheck source=lib.sh
+. scripts/lib.sh
+
+APP_DEST="${PLUME_APP_PATH:-$HOME/Applications/$APP_NAME.app}"
+SHIM="${PLUME_SHIM_PATH:-/usr/local/bin/$EXEC_NAME}"
 
 # The rename does not reach into the login keychain, and recreating the
 # certificate is a keychain operation only you can run. So: prefer the new
@@ -50,13 +57,16 @@ elif ! security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
   exit 1
 fi
 
-swift build -c release
+# Build and sign in dist/: codesign writes temporary files beside its target,
+# and the destination may not be writable by this user.
+./scripts/bundle.sh --output dist --sign "$IDENTITY"
+APP="dist/$APP_NAME.app"
 
-# Sign in the build directory: codesign writes a temporary file beside its target
-# and /usr/local/bin is root-owned.
-codesign -f -s "$IDENTITY" --identifier plume .build/release/plume
-
-requirement=$(codesign -d --requirements - .build/release/plume 2>&1 | tail -1)
+# The guardrail, kept word for word from before the bundle. It is the only
+# thing that *proves* the Accessibility grant will survive the next build. A
+# cdhash-anchored requirement means macOS will treat tomorrow's build as a
+# different application and silently stop letting it type at the cursor.
+requirement=$(codesign -d --requirements - "$APP" 2>&1 | tail -1)
 case "$requirement" in
   *cdhash*)
     echo "signature still anchored to cdhash — the grant would not survive:" >&2
@@ -67,21 +77,33 @@ esac
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 sleep 1
-cat .build/release/plume > "$TARGET"
-chmod 755 "$TARGET"
-launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist"
 
-echo "installed: $TARGET"
+# ditto, not cp -R: cp can drop extended attributes and invalidate the seal,
+# and there is no cat'ing a directory.
+mkdir -p "$(dirname "$APP_DEST")"
+rm -rf "$APP_DEST"
+ditto "$APP" "$APP_DEST"
+
+write_cli_shim "$APP_DEST" "$SHIM"
+
+if [ -f "$HOME/Library/LaunchAgents/$LABEL.plist" ]; then
+  launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist"
+fi
+
+echo "installed:   $APP_DEST"
+echo "cli:         $SHIM"
 echo "requirement: $requirement"
 
 # The daemon's output goes to /dev/null unless the plist was generated with
 # `plume install --launch-at-login --log-file`, which points it at
 # ~/Library/Logs/plume.log (0600). Read the plist rather than guessing: this
-# script reinstalls the binary, it does not regenerate the agent.
+# script reinstalls the app, it does not regenerate the agent.
 log=$(/usr/libexec/PlistBuddy -c "Print :StandardErrorPath" \
     "$HOME/Library/LaunchAgents/$LABEL.plist" 2>/dev/null || echo "unknown")
-if [ "$log" = "/dev/null" ]; then
-  echo "log: discarded — reinstall the agent with 'plume install --launch-at-login --log-file' to keep it"
+if [ "$log" = "unknown" ]; then
+  echo "agent:       none registered — run 'plume install --launch-at-login'"
+elif [ "$log" = "/dev/null" ]; then
+  echo "log:         discarded — reinstall the agent with 'plume install --launch-at-login --log-file' to keep it"
 else
-  echo "log: $log"
+  echo "log:         $log"
 fi

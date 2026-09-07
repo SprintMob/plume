@@ -55,7 +55,7 @@ struct ConfigurationSection: View {
                 SettingsRow(
                     "Launch at login",
                     detail: "Runs plume in the background from the moment you log in.",
-                    help: "Registers ~/Library/LaunchAgents/com.digimata.parrot.plist. The agent never carries your settings as arguments, so everything on this page keeps working."
+                    help: "Registers ~/Library/LaunchAgents/\(Install.label).plist. The agent never carries your settings as arguments, so everything on this page keeps working."
                 ) {
                     Toggle("", isOn: $launchAtLogin)
                         .labelsHidden()

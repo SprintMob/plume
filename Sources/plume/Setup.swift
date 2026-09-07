@@ -16,7 +16,7 @@ struct Setup: ParsableCommand {
         print("  1. Accessibility — to detect the Fn key globally and inject text at the cursor.")
         print("  2. Microphone — to record audio while you hold Fn.")
         print()
-        print("These attach to your terminal app (Terminal/iTerm/Ghostty/etc.), not plume itself.")
+        print("Both are granted to Plume itself, not to the terminal you run this from.")
         print()
 
         try waitForAccessibility()
@@ -37,7 +37,7 @@ struct Setup: ParsableCommand {
         _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
 
         print()
-        print("  1. Toggle your terminal on in the Accessibility list.")
+        print("  1. Toggle Plume on in the Accessibility list.")
         print("  2. Re-run `plume setup` — macOS only picks up the grant on a fresh process.")
         throw ExitCode(0)
     }
@@ -52,7 +52,7 @@ struct Setup: ParsableCommand {
             print("✗ microphone is denied — macOS won't re-prompt once denied.")
             print("  opening Settings → Privacy & Security → Microphone...")
             openSettings("Privacy_Microphone")
-            print("  enable your terminal, then re-run `plume setup`.")
+            print("  enable Plume, then re-run `plume setup`.")
             throw ExitCode(1)
         case .notDetermined:
             print("→ requesting microphone access...")

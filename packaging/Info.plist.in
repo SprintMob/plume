@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>@BUNDLE_ID@</string>
+	<key>CFBundleExecutable</key>
+	<string>@EXEC_NAME@</string>
+	<key>CFBundleName</key>
+	<string>@APP_NAME@</string>
+	<key>CFBundleDisplayName</key>
+	<string>@APP_NAME@</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+
+	<!-- LSUIElement, and never LSBackgroundOnly. LSBackgroundOnly forbids the
+	     process from presenting any UI at all, which would make the
+	     setActivationPolicy(.regular) in SettingsWindowController fail and
+	     delete the settings window. LSUIElement is the agent-app flag and is
+	     explicitly promotable at runtime, which is exactly the .accessory to
+	     .regular switch the code already performs. It also removes the Dock
+	     icon flash at launch. -->
+	<key>LSUIElement</key>
+	<true/>
+
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<!-- Mandatory, not cosmetic. A bundled app that calls
+	     AVCaptureDevice.requestAccess(for: .audio) without this key is killed
+	     by TCC. It works today only because the process doing the asking is
+	     the terminal, which has one. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Plume records audio while you hold the dictation key, transcribes it on this Mac, and types the result at your cursor. Nothing leaves the machine.</string>
+</dict>
+</plist>

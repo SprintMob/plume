@@ -41,6 +41,11 @@ enum DoctorReport {
     /// --no-overlay and --mute-output joined the list when they became
     /// remembered choices too: hand-edited agents carry them, and they fail the
     /// same way.
+    ///
+    /// Two more checks arrived with the .app bundle, both on
+    /// `ProgramArguments[0]`. They are reported before the stale-flag warning
+    /// because either one means the agent is not running plume at all, which
+    /// makes a note about flag precedence beside the point.
     static func checkLaunchAgentArgs(at url: URL = Install.plistURL) -> Check {
         let name = "launch agent"
         guard let data = try? Data(contentsOf: url),
@@ -49,6 +54,32 @@ enum DoctorReport {
         else {
             return Check(name: name, status: .ok, remediation: nil)
         }
+
+        // A stale agent naming a binary that no longer exists used to be
+        // completely invisible here, and the move into a bundle is exactly the
+        // kind of change that deletes the binary an old agent points at.
+        if let program = arguments.first {
+            if !FileManager.default.isExecutableFile(atPath: program) {
+                return Check(
+                    name: name,
+                    status: .fail("points at \(program), which is not there"),
+                    remediation: "re-run `plume install --launch-at-login`"
+                )
+            }
+            // The daemon takes its preferences domain from CFBundleIdentifier,
+            // which it only has inside a bundle. Outside one it falls back to
+            // the process name and reads a domain nothing writes, so every
+            // remembered choice is invisible to it: the menu bar and the
+            // settings window both appear to do nothing at all.
+            if !program.contains(".app/Contents/MacOS/") {
+                return Check(
+                    name: name,
+                    status: .fail("\(program) is not inside a .app, so the daemon ignores every remembered choice"),
+                    remediation: "re-run `plume install --launch-at-login` with Plume.app installed"
+                )
+            }
+        }
+
         let remembered = ["--hotkey", "--inject-mode", "--no-overlay", "--mute-output"]
         let stale = remembered.filter(arguments.contains)
         guard !stale.isEmpty else {
@@ -102,22 +133,32 @@ enum DoctorReport {
             return Check(
                 name: "microphone",
                 status: .fail("denied"),
-                remediation: "System Settings → Privacy & Security → Microphone → enable for your terminal"
+                remediation: "System Settings → Privacy & Security → Microphone → enable for Plume"
             )
         @unknown default:
             return Check(name: "microphone", status: .fail("unknown state"), remediation: nil)
         }
     }
 
+    /// Bundled, the grant belongs to Plume and the remediation can simply say
+    /// so. Unbundled, which is a development build, macOS still attributes the
+    /// request to whatever launched the process, so the old guess at the parent
+    /// name is kept for that case rather than telling a lie that reads better.
     static func checkAccessibility() -> Check {
         if AXIsProcessTrusted() {
             return Check(name: "accessibility", status: .ok, remediation: nil)
         }
-        let parent = parentProcessName() ?? "your terminal"
+        let grantee: String
+        if Bundle.main.bundleIdentifier != nil {
+            grantee = "Plume"
+        } else {
+            grantee = (parentProcessName() ?? "your terminal")
+                + " (this build is not bundled, so the grant goes to its parent)"
+        }
         return Check(
             name: "accessibility",
             status: .fail("not granted"),
-            remediation: "System Settings → Privacy & Security → Accessibility → enable for \(parent)"
+            remediation: "System Settings → Privacy & Security → Accessibility → enable for \(grantee)"
         )
     }
 

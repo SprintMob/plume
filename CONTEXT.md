@@ -135,9 +135,30 @@ the case where something else has taken the pasteboard since.
 _Avoid_: popover, bubble (the type is named `TranscriptFallbackPopover` but it is an
 `NSPanel`)
 
+**App bundle**:
+`Plume.app` — the daemon, its `Info.plist` and the two SwiftPM resource bundles,
+assembled by `scripts/bundle.sh` without Xcode. It exists so macOS has an identity
+to anchor the Accessibility grant on; unbundled, that grant belonged to whichever
+terminal launched the daemon. One string, `com.sprintmob.plume`, is its bundle
+identifier, its launch agent label and its preferences domain — see
+[ADR-0008](./docs/adr/0008-ship-a-real-app-bundle.md).
+_Avoid_: the app, the package (the first is ambiguous with the daemon, the second
+is the SwiftPM package)
+
+**CLI shim**:
+`/usr/local/bin/plume` — three lines that `exec` the executable inside the bundle.
+Not a symlink: `Bundle.main` does not resolve through one, so a symlinked `plume`
+would read a different preferences domain than the daemon. The launch agent points
+at neither, always at the path inside the bundle.
+_Avoid_: symlink, alias, wrapper
+
 **Launch agent**:
-The per-user `com.digimata.parrot` job that keeps the daemon running at login. Its
-`KeepAlive` policy is what turns a warmup failure into a relaunch loop.
+The per-user `com.sprintmob.plume` job that keeps the daemon running at login. Its
+`KeepAlive` policy is what turns a warmup failure into a relaunch loop. Its
+`ProgramArguments[0]` must be inside the **app bundle**: outside one the daemon
+reads the process-name preferences domain and every **remembered choice** is
+invisible to it. Before the rename the label was `com.digimata.parrot`, which
+`doctor` still knows about.
 _Avoid_: service, daemon config, plist (the plist is the file, the launch agent is the job)
 
 ### The fork

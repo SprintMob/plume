@@ -70,6 +70,9 @@ twice.
   dead keys in the history search field. The dock icon that appears with it is the
   honest signal that parrot has something on screen; it goes away with the window.
   There is no `.app` bundle, so the main menu is built in code.
+  *(Amended by [ADR-0008](./0008-ship-a-real-app-bundle.md): there is a bundle
+  now, and the menu is still built in code. The reason changed, from "there is
+  no bundle" to "there is no nib, because there is no Xcode project.")*
 - **The window is reachable only from the menu bar.** No `parrot settings`
   subcommand: a second process cannot raise the running daemon's window without an
   IPC channel that would exist for this one thing.

@@ -8,9 +8,22 @@ struct Plume: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "plume",
         abstract: "Minimal macOS dictation daemon. Hold Fn, speak, release.",
+        // Read out of the bundle rather than kept in a literal, so `plume
+        // --version` and Info.plist agree by construction. Degrades to "dev"
+        // for an unbundled build, which is honest about what it is.
+        version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev",
         subcommands: [Run.self, Setup.self, Doctor.self, Models.self, Install.self],
         defaultSubcommand: Run.self
     )
+
+    /// Double-clicking Plume.app runs the executable with no arguments, which
+    /// `defaultSubcommand` already handles. But LaunchServices can also pass a
+    /// `-psn_0_…` process serial number, and ArgumentParser exits with a usage
+    /// error on any argument it does not expect, so the app would fail to
+    /// launch with nothing on screen to say why. Dropping it costs a line.
+    static func main() {
+        Self.main(CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-psn_") })
+    }
 }
 
 extension HotkeyMonitor.Hotkey: ExpressibleByArgument {}

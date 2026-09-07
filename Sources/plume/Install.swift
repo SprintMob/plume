@@ -2,16 +2,25 @@ import ArgumentParser
 import Foundation
 
 enum InstallError: Error {
-    /// Nothing executable at /usr/local/bin/plume and no usable argv[0]. The
+    /// No Plume.app anywhere and no usable executable to fall back on. The
     /// agent would name a binary that is not there.
     case binaryNotFound
 }
 
 /// Manage plume's LaunchAgent so the daemon starts at login.
 ///
-/// We deliberately do NOT use SMAppService.mainApp here — that requires a full
-/// .app bundle. Since plume ships as a single binary in /usr/local/bin, a
-/// plain LaunchAgent plist is the simpler, more honest mechanism.
+/// Plume ships as a .app bundle now, so `SMAppService.mainApp` has become
+/// available. It is still declined, for four reasons that are not the old one.
+/// It gives no control over `KeepAlive: {SuccessfulExit: false}`, whose policy
+/// is understood and deliberate, see the umask note below. It has no `Umask`
+/// equivalent, and that was a shipped bug fixed on a real install. It cannot
+/// set `ProcessType: Interactive`, which is what lets the daemon promote
+/// itself to `.regular` under launchd and therefore what makes the settings
+/// window work at all. And it has no `StandardOutPath`, which is the whole of
+/// `--log-file` and the privacy argument around it. It also passes no
+/// `ProgramArguments`, so `run --skip-doctor` is inexpressible.
+///
+/// See docs/adr/0008-app-bundle.md.
 struct Install: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Install or remove the launch-at-login LaunchAgent."
@@ -72,7 +81,7 @@ struct Install: ParsableCommand {
             }
         } catch InstallError.binaryNotFound {
             FileHandle.standardError.write(Data(
-                "couldn't locate the plume binary. install it to /usr/local/bin/plume first.\n".utf8
+                "couldn't find Plume.app. install it to /Applications or ~/Applications first.\n".utf8
             ))
             throw ExitCode(1)
         }
@@ -94,7 +103,22 @@ struct Install: ParsableCommand {
 
     // MARK: -
 
-    private static let label = "com.digimata.parrot"
+    /// The bundle identifier, which is also the launchd label and the
+    /// preferences domain. One string, and `packaging/Info.plist.in` is where
+    /// it lives; the literal here is only the fallback for an unbundled
+    /// development build.
+    static let label = Bundle.main.bundleIdentifier ?? "com.sprintmob.plume"
+
+    /// The label used before the rename. Kept indefinitely: it is the only way
+    /// `doctor` can explain why two daemons are competing for the same event
+    /// tap.
+    static let legacyLabel = "com.digimata.parrot"
+
+    static var legacyPlistURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+            .appendingPathComponent("\(Self.legacyLabel).plist")
+    }
 
     /// Applies to every file *and directory* the daemon creates, not just the
     /// log — launchd has no way to scope it. 0o077 gives files 0600 and
@@ -282,21 +306,60 @@ struct Install: ParsableCommand {
         return true
     }
 
-    private static func resolveBinaryPath() throws -> String {
-        // /usr/local/bin/plume is the canonical install path. Honor a real
-        // location if running from elsewhere (e.g. dev).
-        let candidate = "/usr/local/bin/plume"
-        if FileManager.default.isExecutableFile(atPath: candidate) {
-            return candidate
+    /// The two places an installed Plume.app lives: system-wide, then the
+    /// per-user one install-local.sh uses so a rebuild needs no sudo.
+    static let bundleSearchPaths = [
+        "/Applications/Plume.app",
+        NSHomeDirectory() + "/Applications/Plume.app",
+    ]
+
+    /// The invariant this function exists to hold: **`ProgramArguments[0]` must
+    /// be a path inside a `.app` bundle.** An unbundled binary takes its
+    /// preferences domain from the process name rather than from
+    /// `CFBundleIdentifier`, so the daemon would read a different domain than
+    /// the one everything else writes, and every remembered choice made in the
+    /// menu bar or the settings window would be invisible to it. That is a
+    /// total, silent failure, and it is the mode ADR-0004 exists to prevent.
+    /// `DoctorReport.checkLaunchAgentArgs` enforces it from the other side.
+    ///
+    /// `/usr/local/bin/plume` is deliberately absent from the list. It is a
+    /// three-line shim that `exec`s the real binary: pointing launchd at it
+    /// would have launchd supervise a `/bin/sh`, and would detach the TCC
+    /// attribution from the bundle. The shim is for humans.
+    static func resolveBinaryPath() throws -> String {
+        let fm = FileManager.default
+
+        // The bundle we are running from, whether that is /Applications,
+        // ~/Applications or a dist/ directory in a checkout. It is the only
+        // candidate that is certainly the code writing this agent.
+        if Bundle.main.bundleURL.pathExtension == "app",
+           let executable = Bundle.main.executableURL,
+           fm.isExecutableFile(atPath: executable.path) {
+            return executable.path
         }
-        // Fall back to the running executable's resolved path.
-        let argv0 = CommandLine.arguments.first ?? "plume"
-        if argv0.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: argv0) {
-            FileHandle.standardError.write(Data(
-                "note: /usr/local/bin/plume not found; using \(argv0)\n".utf8
-            ))
-            return argv0
+
+        for bundle in bundleSearchPaths {
+            let executable = bundle + "/Contents/MacOS/plume"
+            if fm.isExecutableFile(atPath: executable) {
+                return executable
+            }
         }
+
+        // Development: a bare SwiftPM build. Usable, and worth warning about,
+        // because a daemon started from here has the process-name preferences
+        // domain and none of the remembered choices reach it.
+        let devBuild = FileManager.default.currentDirectoryPath + "/.build/release/plume"
+        if fm.isExecutableFile(atPath: devBuild) {
+            FileHandle.standardError.write(Data("""
+                warning: no Plume.app found; pointing the agent at \(devBuild).
+                         That binary is not bundled, so the daemon will use the
+                         process-name preferences domain and ignore everything
+                         you pick in the menu bar. Run ./scripts/install-local.sh.
+
+                """.utf8))
+            return devBuild
+        }
+
         throw InstallError.binaryNotFound
     }
 
