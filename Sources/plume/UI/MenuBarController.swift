@@ -272,31 +272,50 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func configureButton() {
         guard let button = statusItem.button else { return }
-        let image = Self.birdImage()
+        let image = Self.markImage()
         image?.isTemplate = true
         button.image = image
     }
 
-    // Inlined Lucide bird SVG. Keeping it in source means the executable has
-    // no separate resource bundle to install alongside it — true single-binary.
-    private static let birdSVG = """
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" \
-    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" \
-    stroke-linecap="round" stroke-linejoin="round">\
-    <path d="M16 7h.01"/>\
-    <path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20"/>\
-    <path d="m20 7 2 .5-2 .5"/>\
-    <path d="M10 18v3"/>\
-    <path d="M14 17.75V21"/>\
-    <path d="M7 18a6 6 0 0 0 3.84-10.61"/>\
+    // The mark, drawn at small-text size rather than scaled down.
+    //
+    // The logo is two bars separated by a single horizontal gap of 8.014 on a
+    // height of 136.222, which is 5.88%. Fitted to 16pt wide at the true ratio
+    // the height falls to 8.87pt and that gap to 0.52pt: sub-pixel. The two
+    // bars merge into one grey slab and the mark stops existing.
+    //
+    // So this is not another glyph. It keeps both bars and both cuts, which
+    // are the whole identity, and changes only the two ratios that break: the
+    // length is compressed into a squarer box, and the gap is opened from
+    // 12.5% of a bar's height to 50%. That is what a foundry does for a small
+    // optical size.
+    //
+    // On a 16x16 grid with y downwards, the glyph occupies x 1..15 and y 3..13:
+    // bars 4px tall, a 2px gap, 14x10 overall. Every edge lands on a whole
+    // pixel at 1x except the two 45° diagonals, which are the best case for
+    // antialiasing. At 80% ink over its height it is lighter than the logo's
+    // 94%, which is right beside SF symbols stroked at 1.5pt.
+    //
+    // Inlined rather than shipped as a resource: the executable then has
+    // nothing to install alongside it.
+    private static let markSVG = """
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" \
+    viewBox="0 0 16 16" fill="black">\
+    <path d="M5 7L9 3H15V7H5Z"/>\
+    <path d="M1 9H11L7 13H1V9Z"/>\
     </svg>
     """
 
-    private static func birdImage() -> NSImage? {
-        guard let data = birdSVG.data(using: .utf8),
+    /// `fill="black"` because `isTemplate = true` keeps only the alpha; AppKit
+    /// recolours it to match the menu bar. The status item deliberately carries
+    /// no title or tooltip fallback, so if this ever fails to decode the item
+    /// is empty and silent: verified on device, and the fallback if it breaks
+    /// is to stroke the same path in NSBezierPath, which would also guarantee
+    /// the pixel-grid alignment SVG rasterisation does not.
+    private static func markImage() -> NSImage? {
+        guard let data = markSVG.data(using: .utf8),
               let image = NSImage(data: data)
         else { return nil }
-        // Menu-bar status icons are nominally 18pt tall; size the SVG to match.
         image.size = NSSize(width: 16, height: 16)
         return image
     }

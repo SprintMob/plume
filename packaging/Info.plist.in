@@ -31,6 +31,9 @@
 	<key>LSUIElement</key>
 	<true/>
 
+	<key>CFBundleIconFile</key>
+	<string>plume</string>
+
 	<key>NSHighResolutionCapable</key>
 	<true/>
 

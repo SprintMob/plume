@@ -331,7 +331,15 @@ struct Run: ParsableCommand {
                 } catch {
                     FileHandle.standardError.write(Data("transcription failed: \(error)\n".utf8))
                     await MainActor.run {
-                        overlay.hide()
+                        // stderr is where this went and nowhere else, which for
+                        // a daemon under launchd means nowhere. Gated on the
+                        // overlay like every other pill state: with the overlay
+                        // off, a failure stays as silent as it is today.
+                        if state.overlayEnabled {
+                            overlay.showFailure()
+                        } else {
+                            overlay.hide()
+                        }
                         state.setDictation(.idle)
                     }
                 }

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Flat. No gradient, no bevel, no glass.
+       Squircle at the macOS Big Sur+ template proportions: 824 inset in 1024,
+       corner radius 824 * 0.225. -->
+  <rect x="100" y="100" width="824" height="824" rx="185.4" ry="185.4" fill="#0A0A0A"/>
+  <!-- The same hc-line hairline the pill and the fallback panel carry. It is
+       what stops an almost-black tile reading as a hole in the Dock, without
+       reaching for a gradient. -->
+  <rect x="102" y="102" width="820" height="820" rx="183.4" ry="183.4"
+        fill="none" stroke="#F7F8F3" stroke-opacity="0.14" stroke-width="4"/>
+  <!-- The mark at the logo's true proportions, at 62% of the squircle's width.
+       At this size the inter-bar gap is 16.6px, which is plenty. Lime as a
+       fill on black, never the reverse in the foreground. -->
+  <path fill="#E0FE75" d="M256.5 520.3H611.5L474.9 653.6H256.5V520.3Z"/>
+  <path fill="#E0FE75" d="M412.5 503.7L549.1 370.4H767.5V503.7H412.5Z"/>
+</svg>

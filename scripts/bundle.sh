@@ -66,6 +66,11 @@ plutil -lint "$APP/Contents/Info.plist" > /dev/null
 # the bundle, and it checks Bundle.main.resourceURL first. Shipping the bare
 # binary, which is what happened until now, left a latent crash on every path
 # that falls back to the packaged configs.
+# Committed rather than generated at build time: a contributor on a clean
+# checkout should get an app with an icon without installing librsvg.
+# scripts/make-icns.sh regenerates it when the SVG sources change.
+cp Design/icon/plume.icns "$APP/Contents/Resources/plume.icns"
+
 for resource in "$BIN_DIR"/*.bundle; do
   [ -e "$resource" ] || continue
   cp -R "$resource" "$APP/Contents/Resources/"

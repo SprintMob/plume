@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The inverse, for the README and social images. Both are legal, since
+       lime is a fill in each. Black wins for the app icon because it matches
+       the only other place the mark is seen, the dictation pill, and because
+       the product is a daemon that is silent until you press a key. A
+       saturated lime tile shouting from the Dock would say the opposite.
+       Shouting is correct in a README. -->
+  <rect x="100" y="100" width="824" height="824" rx="185.4" ry="185.4" fill="#E0FE75"/>
+  <path fill="#0A0A0A" d="M256.5 520.3H611.5L474.9 653.6H256.5V520.3Z"/>
+  <path fill="#0A0A0A" d="M412.5 503.7L549.1 370.4H767.5V503.7H412.5Z"/>
+</svg>

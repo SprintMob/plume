@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Drives every size at or below 64px.
+       At 64px the true mark's inter-bar gap is 1.04px, so downscaling the
+       1024 source produces exactly the grey slab the menu bar glyph exists to
+       avoid. This carries the same open-gap cut as that glyph, scaled up: the
+       gap is 50% of a bar's height rather than 12.5%. -->
+  <rect x="100" y="100" width="824" height="824" rx="185.4" ry="185.4" fill="#0A0A0A"/>
+  <rect x="102" y="102" width="820" height="820" rx="183.4" ry="183.4"
+        fill="none" stroke="#F7F8F3" stroke-opacity="0.14" stroke-width="4"/>
+  <g transform="translate(220.07,220.08) scale(36.49)" fill="#E0FE75">
+    <path d="M5 7L9 3H15V7H5Z"/>
+    <path d="M1 9H11L7 13H1V9Z"/>
+  </g>
+</svg>

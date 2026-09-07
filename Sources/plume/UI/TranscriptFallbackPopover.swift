@@ -20,7 +20,7 @@ final class TranscriptFallbackPopover {
 
     private func makePanel(transcript: String) -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 148),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 152),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -61,8 +61,17 @@ final class TranscriptFallbackPopover {
         return panel
     }
 
+    /// The screen under the pointer, not `NSScreen.main`, which follows
+    /// keyboard focus and is nil when no window has it. The overlay pill has
+    /// used the pointer's screen all along with a comment saying why; this
+    /// panel did not, so it could appear on a different display from the pill
+    /// that had just been shown on the one the user was looking at.
     private func positionAtBottomCenter(_ panel: NSPanel) {
-        guard let screen = NSScreen.main else { return }
+        let pointer = NSEvent.mouseLocation
+        guard
+            let screen = NSScreen.screens.first(where: { $0.frame.contains(pointer) })
+                ?? NSScreen.main ?? NSScreen.screens.first
+        else { return }
         let visible = screen.visibleFrame
         panel.setFrameOrigin(
             NSPoint(
@@ -81,11 +90,15 @@ private struct TranscriptFallbackView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Style.Space.x3) {
             HStack(spacing: Style.Space.x2) {
+                // One lime element per surface, and on this one it is the
+                // button. A lime glyph up here plus a lime pill down there
+                // draws a diagonal that pulls the eye off the transcript,
+                // which is the content.
                 Image(systemName: "text.cursor")
                     .font(Style.font(Style.Text.body, .semibold))
-                    .foregroundStyle(Style.lime)
+                    .foregroundStyle(Style.Dark.ink45)
 
-                Text("No text field selected")
+                Text("No text field was focused")
                     .font(Style.font(Style.Text.body, .semibold))
                     .foregroundStyle(Style.Dark.ink)
 
@@ -108,13 +121,21 @@ private struct TranscriptFallbackView: View {
                 .textSelection(.enabled)
                 .padding(.horizontal, Style.Space.x3)
                 .padding(.vertical, Style.Space.x2)
+                // elev2 as the fill, lineSoft as the border. The brand's
+                // elevation model separates the two, and the value this
+                // replaces was a hairline token doing a surface's job.
+                // #181818 on #0A0A0A is a visible step.
                 .background(
-                    Style.Dark.lineSoft,
+                    Style.Dark.elev2,
                     in: RoundedRectangle(cornerRadius: Style.Radius.btn)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Style.Radius.btn)
+                        .strokeBorder(Style.Dark.lineSoft, lineWidth: 1)
                 )
 
             HStack {
-                Text("Copied \u{2014} press \u{2318}V where you want it.")
+                Text("The text is on the clipboard. Press \u{2318}V where you want it.")
                     .font(Style.font(Style.Text.caption))
                     .foregroundStyle(Style.Dark.ink70)
 
@@ -135,10 +156,16 @@ private struct TranscriptFallbackView: View {
             }
         }
         .padding(.horizontal, Style.Space.x4)
-        .padding(.vertical, 14)
+        .padding(.vertical, Style.Space.x4)
         .background(
-            RoundedRectangle(cornerRadius: Style.Radius.lg + 2)
+            RoundedRectangle(cornerRadius: Style.Radius.lg, style: .continuous)
                 .fill(Style.Dark.bg)
+        )
+        // The same 1pt hairline the pill carries, and for the same reason.
+        // These two are meant to read as one object at two sizes.
+        .overlay(
+            RoundedRectangle(cornerRadius: Style.Radius.lg, style: .continuous)
+                .strokeBorder(Style.Dark.line, lineWidth: 1)
         )
     }
 }
