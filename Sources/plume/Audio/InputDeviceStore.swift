@@ -16,6 +16,9 @@ final class InputDeviceStore {
 
     private static let selectionKey = "inputDeviceUID"
 
+    /// See `SettingsStore.migratableKeys`.
+    static let migratableKeys = [selectionKey]
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

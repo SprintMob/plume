@@ -32,7 +32,7 @@ menu bar, or press ⌘, once plume is in front.
 
 | Section | What's in it |
 |---|---|
-| **Home** | What plume is doing, the active model, and the five `plume doctor` checks with the fix for each |
+| **Home** | What plume is doing, the active model, and the `plume doctor` checks with the fix for each |
 | **Configuration** | The dictation overlay, the hold-to-talk key, launch at login, injection mode, and whether to keep a session history |
 | **Sound** | Which microphone to use, and whether to mute system audio while dictating |
 | **Models** | Every model, its size, and whether it's downloaded — click one to switch |
@@ -56,6 +56,7 @@ plume setup                           # one-time setup: permissions + model down
 plume install --launch-at-login       # register a LaunchAgent (background daemon)
 plume install --uninstall             # remove the LaunchAgent
 plume install --purge-legacy-logs     # delete world-readable /tmp logs from older versions
+plume install --migrate               # move models and settings over from a parrot install
 plume doctor                          # check permissions + push-to-talk key setting
 plume models list                     # list available models
 plume models download <id>            # pre-download a model
@@ -132,6 +133,31 @@ promise it writes none; it cannot promise nothing does.
 `plume install --launch-at-login` discards the daemon's output. To keep it, add
 `--log-file` and it goes to `~/Library/Logs/plume.log`, created `0600` and owned by you.
 Either way the log holds no transcript text.
+
+## Upgrading from parrot
+
+Plume was called parrot until 2026-09. If you have an install from then, run it
+once:
+
+```sh
+plume install --migrate
+```
+
+It boots the old launch agent out, moves the model weights (a rename on the same
+volume, so instant rather than a multi-gigabyte copy), moves the log and the
+capture cache, and carries every remembered choice over to the new preferences
+domain. It checks everything it needs before it moves a single byte, and refuses
+rather than half-finishing. Running it twice is safe. `plume doctor` tells you
+when it is needed and confirms when it is done.
+
+Two things it does not do. It leaves `~/Library/Preferences/parrot.plist` alone,
+which is a few hundred bytes and the only way to replay the migration if you
+throw the new install away. And it prints, rather than runs, the `sudo rm` for
+the old `/usr/local/bin/parrot`: a background daemon has no business asking for
+root.
+
+The saved position of the settings window is not carried over. It is a
+rectangle.
 
 > **If you installed this back when it was parrot**, the daemon was writing every transcript
 > in plaintext to `/tmp/parrot.err.log`, which any local user can read, with no rotation

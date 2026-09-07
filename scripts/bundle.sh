@@ -5,7 +5,7 @@
 # on the designated requirement of the code that asked for it; unbundled, that
 # code is whichever terminal happened to launch the daemon, so the grant is
 # attached to Terminal or iTerm or Ghostty and is lost the day you switch. A
-# bundle with a stable identifier ends that. See docs/adr/0008-app-bundle.md.
+# bundle with a stable identifier ends that. See docs/adr/0008-ship-a-real-app-bundle.md.
 #
 #   ./scripts/bundle.sh                      # dist/Plume.app, ad-hoc signed
 #   ./scripts/bundle.sh --output /tmp/check  # somewhere else

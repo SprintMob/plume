@@ -20,7 +20,7 @@ enum InstallError: Error {
 /// `--log-file` and the privacy argument around it. It also passes no
 /// `ProgramArguments`, so `run --skip-doctor` is inexpressible.
 ///
-/// See docs/adr/0008-app-bundle.md.
+/// See docs/adr/0008-ship-a-real-app-bundle.md.
 struct Install: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Install or remove the launch-at-login LaunchAgent."
@@ -38,6 +38,9 @@ struct Install: ParsableCommand {
     @Flag(name: .long, help: "Delete the world-readable /tmp/parrot.{out,err}.log files left by earlier versions.")
     var purgeLegacyLogs: Bool = false
 
+    @Flag(name: .long, help: "Move models, settings, logs and the launch agent over from a parrot install.")
+    var migrate: Bool = false
+
     @Option(name: .long, help: "Push-to-talk modifier to remember as the default.")
     var hotkey: HotkeyMonitor.Hotkey?
 
@@ -51,9 +54,9 @@ struct Install: ParsableCommand {
             ))
             throw ExitCode(64)
         }
-        if !launchAtLogin && !uninstall && !purgeLegacyLogs {
+        if !launchAtLogin && !uninstall && !purgeLegacyLogs && !migrate {
             FileHandle.standardError.write(Data(
-                "specify exactly one of --launch-at-login or --uninstall\n".utf8
+                "specify exactly one of --launch-at-login, --uninstall or --migrate\n".utf8
             ))
             throw ExitCode(64)
         }
@@ -61,6 +64,10 @@ struct Install: ParsableCommand {
         reportLegacyLogs()
         if purgeLegacyLogs {
             reportPurgedLegacyLogs()
+        }
+        if migrate {
+            try runMigration()
+            return
         }
 
         // Recorded rather than baked into the agent's argv: a flag in
@@ -84,6 +91,41 @@ struct Install: ParsableCommand {
                 "couldn't find Plume.app. install it to /Applications or ~/Applications first.\n".utf8
             ))
             throw ExitCode(1)
+        }
+    }
+
+    /// Preconditions first, action second, and nothing in between. See
+    /// `Migration` for why this is a command rather than something the daemon
+    /// does at first launch or something `doctor` offers to fix.
+    private func runMigration() throws {
+        let migration = Migration()
+
+        guard migration.isNeeded else {
+            print("nothing to migrate: no parrot install found")
+            return
+        }
+
+        let problems = migration.preflight()
+        guard problems.isEmpty else {
+            var msg = "migration stopped before moving anything:\n"
+            for problem in problems {
+                msg += "  ✗ \(problem)\n"
+            }
+            FileHandle.standardError.write(Data(msg.utf8))
+            throw ExitCode(1)
+        }
+
+        let report = try migration.run()
+        for line in report.done {
+            print("✓ \(line)")
+        }
+        guard !report.manual.isEmpty else {
+            print("\nmigration complete. run `plume doctor` to confirm.")
+            return
+        }
+        print("\nstill to do, by hand:")
+        for line in report.manual {
+            print("  → \(line)")
         }
     }
 
@@ -365,7 +407,9 @@ struct Install: ParsableCommand {
 
     private static func uid() -> uid_t { getuid() }
 
-    private static func runLaunchctl(_ args: [String]) -> (status: Int32, stderr: String) {
+    /// Shared with `Migration`, which has to boot the pre-rename agent out
+    /// before anything it could still be writing to is moved.
+    static func runLaunchctl(_ args: [String]) -> (status: Int32, stderr: String) {
         let task = Process()
         task.launchPath = "/bin/launchctl"
         task.arguments = args

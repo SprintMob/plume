@@ -9,6 +9,10 @@ final class ModelStore {
     private static let selectionKey = "modelID"
     private static let previousKey = "previousModelID"
 
+    /// See `SettingsStore.migratableKeys`. Losing `modelID` across the rename
+    /// would re-download gigabytes of weights for a missing string.
+    static let migratableKeys = [selectionKey, previousKey]
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

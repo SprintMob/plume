@@ -2,7 +2,7 @@ import SwiftUI
 
 /// What plume is doing, and whether it can do it at all.
 ///
-/// The checks are `DoctorReport.run` — the same five the CLI prints — so there
+/// The checks are `DoctorReport.run` — the same six the CLI prints — so there
 /// is one answer to "is this set up", whichever way you ask.
 struct HomeSection: View {
     @ObservedObject var state: DaemonState
@@ -98,7 +98,7 @@ struct HomeSection: View {
         }
     }
 
-    /// Two of the five checks shell out — accessibility reads `ps`, the Fn
+    /// Two of the six checks shell out — accessibility reads `ps`, the Fn
     /// mapping reads `defaults` — so they run off the main thread rather than
     /// stalling the window on a section change.
     private func recheck() {

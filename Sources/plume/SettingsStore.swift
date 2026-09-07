@@ -15,6 +15,13 @@ final class SettingsStore {
     private static let muteOutputKey = "muteOutput"
     private static let sessionHistoryKey = "sessionHistory"
 
+    /// Every key this store writes, so `Migration` carries them without anyone
+    /// having to remember to add them there. A store that gains a key gains
+    /// migration with it.
+    static let migratableKeys = [
+        hotkeyKey, injectModeKey, overlayKey, muteOutputKey, sessionHistoryKey,
+    ]
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

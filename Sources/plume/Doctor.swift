@@ -30,7 +30,28 @@ enum DoctorReport {
         }
         checks.append(checkLegacyLogs())
         checks.append(checkLaunchAgentArgs())
+        checks.append(checkLegacyLaunchAgent())
         return checks
+    }
+
+    /// The pre-rename agent, left behind by an install that has not migrated.
+    /// Two agents each holding a `CGEventTap` on the same modifier is a tap
+    /// collision, and nothing else in the app is in a position to say so.
+    ///
+    /// This detects; `install --migrate` acts. Same split as `checkLegacyLogs`
+    /// and `install --purge-legacy-logs`, and for the same reason: `doctor` is
+    /// read-only by construction, and moving gigabytes of weights is not
+    /// something to do as a side effect of a status command.
+    static func checkLegacyLaunchAgent(at url: URL = Install.legacyPlistURL) -> Check {
+        let name = "legacy launch agent"
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return Check(name: name, status: .ok, remediation: nil)
+        }
+        return Check(
+            name: name,
+            status: .warn("\(Install.legacyLabel) is still registered — two daemons will fight over the event tap"),
+            remediation: "run `plume install --migrate`"
+        )
     }
 
     /// Versions up to v0.0.6 baked --hotkey and --inject-mode into the launch
