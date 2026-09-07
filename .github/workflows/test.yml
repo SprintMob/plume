@@ -1,0 +1,48 @@
+# The CI that did not exist. Three jobs' worth of YAML is what turns "every
+# commit builds on its own" from an aspiration into something checked, and it
+# is what would have caught the 116 lines of tests committed against an API
+# that was never written.
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: build, test and bundle
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # bundle.sh reads the version from the latest v* tag.
+          fetch-depth: 0
+
+      - name: swift version
+        run: swift --version
+
+      - name: cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: build
+        run: swift build -c release
+
+      - name: test
+        run: swift test
+
+      - name: bundle
+        run: ./scripts/bundle.sh --output /tmp/bundlecheck
+
+      - name: lint Info.plist
+        run: plutil -lint /tmp/bundlecheck/Plume.app/Contents/Info.plist
+
+      - name: the rename left nothing behind
+        run: ./scripts/check-rename.sh

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The hardened runtime is required for notarization, and it blocks
+	     microphone access unless this is declared. The CGEventTap needs the
+	     Accessibility TCC grant rather than an entitlement, so the hardened
+	     runtime should not break it, and nothing is dlopen'd at runtime (the
+	     CoreML weights are data), so no library-validation exception. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

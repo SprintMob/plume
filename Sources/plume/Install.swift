@@ -83,6 +83,7 @@ struct Install: ParsableCommand {
                 print(removed
                     ? "✓ launch-at-login removed"
                     : "nothing to remove (no agent at \(Install.plistURL.path))")
+                reportWhatIsLeft()
             } else if launchAtLogin {
                 try reportInstalled(Install.writeAgent(logFile: logFile))
             }
@@ -91,6 +92,36 @@ struct Install: ParsableCommand {
                 "couldn't find Plume.app. install it to /Applications or ~/Applications first.\n".utf8
             ))
             throw ExitCode(1)
+        }
+    }
+
+    /// `--uninstall` removes the launch agent, which is all it has ever
+    /// claimed to do. With a real .app there are two more things on disk and a
+    /// directory of weights, and leaving someone to find those themselves is
+    /// the kind of thing an open source release gets judged on. Printed rather
+    /// than done: deleting an app and gigabytes of weights is a decision, and
+    /// two of the three paths need root.
+    private func reportWhatIsLeft() {
+        let fm = FileManager.default
+        var leftovers: [String] = []
+
+        for bundle in Install.bundleSearchPaths where fm.fileExists(atPath: bundle) {
+            let needsRoot = !fm.isWritableFile(atPath: (bundle as NSString).deletingLastPathComponent)
+            leftovers.append("\(needsRoot ? "sudo " : "")rm -rf \(bundle)")
+        }
+        let shim = "/usr/local/bin/plume"
+        if fm.fileExists(atPath: shim) {
+            leftovers.append("sudo rm \(shim)")
+        }
+        let models = ModelWeights.root.path
+        if fm.fileExists(atPath: models) {
+            leftovers.append("rm -rf \(models)    # the downloaded models")
+        }
+
+        guard !leftovers.isEmpty else { return }
+        print("\nstill on disk, if you want it gone:")
+        for line in leftovers {
+            print("  \(line)")
         }
     }
 

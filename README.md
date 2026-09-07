@@ -12,7 +12,28 @@ plume install --launch-at-login   # optional — runs in the background on login
 
 **Requires:** macOS 14+ on Apple Silicon (M1 or newer). Transcription runs on the Apple Neural Engine via CoreML — so the installer refuses to run on Intel.
 
-The installer drops the binary in `/usr/local/bin/plume`. Builds are unsigned for now, so the installer strips the quarantine xattr — once you've inspected the script you'll see exactly what it does.
+The installer puts `Plume.app` in `/Applications` and writes `/usr/local/bin/plume`, three lines that run the binary inside it. Read the script before you pipe it to a shell; it does what it says here and nothing else.
+
+### Plume is not notarized
+
+SprintMob does not have an Apple Developer ID yet, so the app carries an ad-hoc
+signature. Two consequences, and neither is hidden:
+
+1. **If you download the zip in a browser**, macOS quarantines it and refuses to
+   open it. The message is "Plume is damaged and can't be opened," which is what
+   macOS says about any app it cannot verify. The `curl … | sh` installer above
+   does not go through a browser, so nothing is quarantined and this does not
+   happen. If you did download it by hand:
+   `xattr -dr com.apple.quarantine /Applications/Plume.app`.
+2. **Every update costs you the Accessibility grant.** An ad-hoc signature is
+   anchored to the exact bytes of the build, so macOS treats each release as a
+   different application. After updating, Plume will still record and
+   transcribe, and will silently stop typing at the cursor until you re-enable
+   it under System Settings → Privacy & Security → Accessibility. `plume doctor`
+   will tell you that is what happened.
+
+Both go away the day we ship a Developer ID-signed, notarized build. The reason
+to buy one is this second point, not the first.
 
 ## How to use
 
@@ -54,7 +75,7 @@ Turn it off entirely under Configuration → Application.
 plume                                 # run in the foreground (^C to quit)
 plume setup                           # one-time setup: permissions + model download
 plume install --launch-at-login       # register a LaunchAgent (background daemon)
-plume install --uninstall             # remove the LaunchAgent
+plume install --uninstall             # remove the LaunchAgent, and list what is left
 plume install --purge-legacy-logs     # delete world-readable /tmp logs from older versions
 plume install --migrate               # move models and settings over from a parrot install
 plume doctor                          # check permissions + push-to-talk key setting
