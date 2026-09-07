@@ -170,7 +170,7 @@ struct Install: ParsableCommand {
         if logFile {
             print("  logs:   \(agent.logPath) (mode 0600)")
         } else {
-            print("  logs:   discarded — pass --log-file to keep them")
+            print("  logs:   discarded. pass --log-file to keep them")
         }
     }
 
@@ -325,7 +325,7 @@ struct Install: ParsableCommand {
         for path in found {
             let attrs = try? fm.attributesOfItem(atPath: path)
             let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
-            msg += "     \(path) — \(size) bytes\n"
+            msg += "     \(path), \(size) bytes\n"
         }
         msg += "   these are world-readable and contain the text of every transcript\n"
         msg += "   it produced while the daemon was running.\n"

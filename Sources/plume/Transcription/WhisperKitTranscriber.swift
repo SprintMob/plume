@@ -53,7 +53,7 @@ actor WhisperKitTranscriber: Transcriber {
         let path = legacyModelStore.path(percentEncoded: false)
         guard FileManager.default.fileExists(atPath: path) else { return }
         FileHandle.standardError.write(Data(
-            "models now live in \(ModelWeights.whisperKitBase.path(percentEncoded: false)) — \(path) is unused, delete it to reclaim space\n".utf8
+            "models now live in \(ModelWeights.whisperKitBase.path(percentEncoded: false)). \(path) is unused; delete it to reclaim space\n".utf8
         ))
     }
 

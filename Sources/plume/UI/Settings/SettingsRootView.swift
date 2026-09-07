@@ -42,11 +42,15 @@ struct SettingsRootView: View {
         }
 
         /// Tinted rows are the ones that show something; plain rows are the
-        /// ones that change something.
+        /// ones that change something. That distinction is kept, and the
+        /// coloured bullet is the native idiom in System Settings since
+        /// Ventura. What goes is the arbitrariness: orange and purple came
+        /// from nowhere. Both are lime now, so the distinction survives, two
+        /// meaningless hues die, and the bullet is identical in light and
+        /// dark.
         var tint: Color? {
             switch self {
-            case .home: return .orange
-            case .history: return .purple
+            case .home, .history: return Style.lime
             case .configuration, .sound, .models: return nil
             }
         }
@@ -71,16 +75,16 @@ struct SettingsRootView: View {
             detail
                 .navigationSplitViewColumnWidth(min: 520, ideal: 660)
         }
-        .navigationTitle("plume")
+        .navigationTitle("Plume")
     }
 
     private func row(_ section: Section) -> some View {
         Label {
-            Text(section.title).font(.system(size: 13, weight: .medium))
+            Text(section.title).font(Style.font(Style.Text.body, .medium))
         } icon: {
             SidebarIcon(symbol: section.symbol, tint: section.tint)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Style.Space.half)
         .tag(section)
     }
 

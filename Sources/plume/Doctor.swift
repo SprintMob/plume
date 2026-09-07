@@ -22,7 +22,7 @@ enum DoctorReport {
     /// user who never asked for it.
     static func run(hotkey: HotkeyMonitor.Hotkey) -> [Check] {
         var checks = [
-            checkMicrophone(),
+            checkMicrophone(hotkey: hotkey),
             checkAccessibility(),
         ]
         if hotkey == .fn {
@@ -49,7 +49,7 @@ enum DoctorReport {
         }
         return Check(
             name: name,
-            status: .warn("\(Install.legacyLabel) is still registered — two daemons will fight over the event tap"),
+            status: .warn("\(Install.legacyLabel) is still registered. Two daemons will fight over the event tap"),
             remediation: "run `plume install --migrate`"
         )
     }
@@ -108,7 +108,7 @@ enum DoctorReport {
         }
         return Check(
             name: name,
-            status: .warn("\(list(stale)) baked in — overrides the remembered choice"),
+            status: .warn("\(list(stale)) baked in, overriding the remembered choice"),
             remediation: "re-run `plume install --launch-at-login`"
         )
     }
@@ -139,7 +139,11 @@ enum DoctorReport {
         )
     }
 
-    static func checkMicrophone() -> Check {
+    /// Takes the hotkey for one line of copy, and that line was wrong before:
+    /// it said "hold Fn" to everyone, including the people who had changed the
+    /// key, who are exactly the people least able to guess what it meant. The
+    /// modifier was already resolved one call up.
+    static func checkMicrophone(hotkey: HotkeyMonitor.Hotkey) -> Check {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         switch status {
         case .authorized:
@@ -147,8 +151,8 @@ enum DoctorReport {
         case .notDetermined:
             return Check(
                 name: "microphone",
-                status: .warn("not yet requested — will prompt on first recording"),
-                remediation: "run plume and hold Fn once; macOS will prompt"
+                status: .warn("not yet requested, will prompt on first recording"),
+                remediation: "run plume and hold \(hotkey.glyph) once; macOS will prompt"
             )
         case .denied, .restricted:
             return Check(
@@ -190,7 +194,7 @@ enum DoctorReport {
         guard let raw, let value = Int(raw) else {
             return Check(
                 name: "fn key mapping",
-                status: .warn("unset — system default may intercept Fn"),
+                status: .warn("unset, the system default may intercept Fn"),
                 remediation: "System Settings → Keyboard → Press 🌐 key to → Do Nothing"
             )
         }

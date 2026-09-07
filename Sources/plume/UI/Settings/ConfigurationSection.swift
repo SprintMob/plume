@@ -46,7 +46,7 @@ struct ConfigurationSection: View {
                     detail: "Double-tap \(state.hotkey.rawValue) to keep recording without holding; tap once to stop."
                 ) {
                     Text("Always on")
-                        .font(.system(size: 11))
+                        .font(Style.font(Style.Text.caption))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -107,7 +107,7 @@ struct ConfigurationSection: View {
     private var injectionDetail: String {
         switch state.injectMode {
         case .paste:
-            return "Puts the transcript on the pasteboard, sends ⌘V, and puts back what was there."
+            return "Puts the transcript on the pasteboard and sends ⌘V. What was copied before is replaced, and not put back."
         case .typeUnicode:
             return "Types the characters directly. Terminals and Electron apps drop them silently."
         }

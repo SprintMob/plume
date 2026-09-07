@@ -11,13 +11,13 @@ struct SettingsPage<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: Style.Space.x6) {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 26)
-            .padding(.top, 26)
-            .padding(.bottom, 30)
+            .padding(.horizontal, Style.Space.x6)
+            .padding(.top, Style.Space.x6)
+            .padding(.bottom, Style.Space.x8)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
@@ -36,27 +36,27 @@ struct SettingsGroup<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: Style.Space.x2) {
             if let title {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Style.font(Style.Text.body, .semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.leading, 2)
+                    .padding(.leading, Style.Space.half)
             }
             VStack(spacing: 0) {
                 content
             }
             .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: Style.Radius.btn))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: Style.Radius.btn)
                     .strokeBorder(Color(nsColor: .separatorColor).opacity(0.7))
             )
             if let footnote {
                 Text(footnote)
-                    .font(.system(size: 11))
+                    .font(Style.font(Style.Text.caption))
                     .foregroundStyle(.tertiary)
-                    .padding(.leading, 2)
+                    .padding(.leading, Style.Space.half)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -66,7 +66,7 @@ struct SettingsGroup<Content: View>: View {
 /// The hairline between two rows of a group, inset the way macOS insets it.
 struct SettingsDivider: View {
     var body: some View {
-        Divider().padding(.leading, 14)
+        Divider().padding(.leading, Style.Space.x4)
     }
 }
 
@@ -90,29 +90,29 @@ struct SettingsRow<Control: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(title).font(.system(size: 13, weight: .medium))
+        HStack(alignment: .center, spacing: Style.Space.x3) {
+            VStack(alignment: .leading, spacing: Style.Space.half) {
+                HStack(spacing: Style.Space.x1) {
+                    Text(title).font(Style.font(Style.Text.body, .medium))
                     if let help {
                         Image(systemName: "questionmark.circle")
-                            .font(.system(size: 11))
+                            .font(Style.font(Style.Text.caption))
                             .foregroundStyle(.tertiary)
                             .help(help)
                     }
                 }
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11))
+                        .font(Style.font(Style.Text.caption))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: Style.Space.x3)
             control
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.horizontal, Style.Space.x4)
+        .padding(.vertical, Style.Space.x3)
     }
 }
 
@@ -129,7 +129,7 @@ struct KeyCap: View {
             .padding(.vertical, Style.Space.half + 1)
             .background(
                 Color(nsColor: .quaternaryLabelColor).opacity(0.55),
-                in: RoundedRectangle(cornerRadius: Style.Radius.xs - 1)
+                in: RoundedRectangle(cornerRadius: Style.Radius.xs)
             )
     }
 }
@@ -140,10 +140,10 @@ struct HotkeyCaps: View {
     let hotkey: HotkeyMonitor.Hotkey
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Style.Space.x1) {
             if let side = hotkey.side {
                 Text(side)
-                    .font(.system(size: 11))
+                    .font(Style.font(Style.Text.caption))
                     .foregroundStyle(.secondary)
             }
             KeyCap(label: hotkey.glyph)
@@ -183,16 +183,17 @@ struct SidebarIcon: View {
     var body: some View {
         Group {
             if let tint {
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: Style.Radius.xs)
                     .fill(tint)
                     .overlay(
                         Image(systemName: symbol)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(Style.font(Style.Text.caption, .semibold))
+                            // On lime, never white: white on lime is 1.13:1.
+                            .foregroundStyle(Style.onLime)
                     )
             } else {
                 Image(systemName: symbol)
-                    .font(.system(size: 13))
+                    .font(Style.font(Style.Text.body))
                     .foregroundStyle(.secondary)
             }
         }

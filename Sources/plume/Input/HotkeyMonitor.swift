@@ -101,7 +101,7 @@ final class HotkeyMonitor {
         let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
         if !trusted {
             FileHandle.standardError.write(Data(
-                "accessibility not granted — system prompt opened. Grant access, then quit and relaunch plume.\n".utf8
+                "accessibility not granted. system prompt opened; grant access, then quit and relaunch plume.\n".utf8
             ))
             throw HotkeyError.tapCreateFailed
         }
@@ -167,7 +167,7 @@ final class HotkeyMonitor {
         isPressed = false
         onEvent?(.interrupted)
         FileHandle.standardError.write(Data(
-            "event tap was disabled by the system — re-enabled\n".utf8
+            "event tap was disabled by the system, re-enabled\n".utf8
         ))
     }
 

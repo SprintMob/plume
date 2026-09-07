@@ -30,7 +30,7 @@ struct SoundSection: View {
                         // is currently unplugged leaves the picker blank, which
                         // reads as broken rather than as unplugged.
                         if let missing = rememberedButMissing {
-                            Text("Remembered device — not connected")
+                            Text("Remembered device, not connected")
                                 .tag(String?.some(missing))
                         }
                     }
@@ -43,7 +43,7 @@ struct SoundSection: View {
                 SettingsRow(
                     "System audio while dictating",
                     detail: "Keeps a browser tab or a music player out of the microphone.",
-                    help: "Mutes the active output for the length of the dictation and puts the previous mute — or volume, on AirPods and other Bluetooth devices — back when it ends."
+                    help: "Mutes the active output for the length of the dictation. Puts the previous mute back when it ends, or the previous volume on AirPods and other Bluetooth devices."
                 ) {
                     Picker("", selection: $state.muteOutputEnabled) {
                         Text("Leave playing").tag(false)
@@ -72,7 +72,7 @@ struct SoundSection: View {
     /// saying when it is not what the picker shows.
     private var microphoneDetail: String? {
         if rememberedButMissing != nil {
-            return "Not connected — recording from the system default until it is back."
+            return "Not connected. Recording from the system default until it is back."
         }
         return selectedUID == nil ? "Following whatever macOS is set to." : nil
     }

@@ -25,7 +25,7 @@ struct ModelsSection: View {
         SettingsPage {
             SettingsGroup(
                 "Models",
-                footnote: "plume keeps the model in use and the one before it, and removes the rest as soon as a switch succeeds — so going back costs nothing and there is no delete button to get wrong."
+                footnote: "plume keeps the model in use and the one before it, and removes the rest as soon as a switch succeeds. Going back costs nothing, and there is no delete button to get wrong."
             ) {
                 header
                 ForEach(rows) { row in
@@ -36,7 +36,7 @@ struct ModelsSection: View {
 
             SettingsGroup(
                 "Dictation examples",
-                footnote: "Whisper models only — Parakeet ignores them. Examples teach the decoder how you phrase things, not which words exist: a bare list of terms measures worse than nothing."
+                footnote: "Whisper models only. Parakeet ignores them. Examples teach the decoder how you phrase things, not which words exist: a bare list of terms measures worse than nothing."
             ) {
                 SettingsRow(
                     "Example sentences",
@@ -59,7 +59,7 @@ struct ModelsSection: View {
             Text("Size").frame(width: 70, alignment: .trailing)
             Text("Status").frame(width: 130, alignment: .trailing)
         }
-        .font(.system(size: 11, weight: .medium))
+        .font(Style.font(Style.Text.caption, .medium))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -87,16 +87,22 @@ private struct ModelRow: View {
 
     var body: some View {
         Button(action: select) {
-            HStack(spacing: 12) {
-                HStack(spacing: 5) {
-                    if row.model.recommended {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Style.lime)
-                            .help("Recommended")
-                    }
+            HStack(spacing: Style.Space.x3) {
+                HStack(spacing: Style.Space.x2) {
                     Text(row.model.displayName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Style.font(Style.Text.body, .medium))
+                    if row.model.recommended {
+                        // Was a lime star, which is 1.13:1 on a light window,
+                        // so in the light appearance it was simply not there.
+                        // A capsule uses lime the only way lime works, as a
+                        // fill, and the word says what the star was hoping to.
+                        Text("Recommended")
+                            .font(Style.font(Style.Text.caption, .semibold))
+                            .foregroundStyle(Style.onLime)
+                            .padding(.horizontal, Style.Space.x2)
+                            .padding(.vertical, 1)
+                            .background(Style.lime, in: Capsule())
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -110,10 +116,10 @@ private struct ModelRow: View {
                 ModelStatusLabel(status: row.status)
                     .frame(width: 130, alignment: .trailing)
             }
-            .font(.system(size: 12))
+            .font(Style.font(Style.Text.caption))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, Style.Space.x4)
+            .padding(.vertical, Style.Space.x3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -128,37 +134,38 @@ private struct ModelStatusLabel: View {
     var body: some View {
         switch status {
         case .active:
+            // A status, and lime does not carry status. The weight does.
             Text("Active")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Style.lime)
+                .font(Style.font(Style.Text.caption, .semibold))
+                .foregroundStyle(.primary)
         case .downloading(let fraction):
-            HStack(spacing: 6) {
+            HStack(spacing: Style.Space.x2) {
                 ProgressView(value: fraction)
                     .progressViewStyle(.linear)
                     .frame(width: 64)
                 Text("\(Int(fraction * 100))%")
-                    .font(.system(size: 11))
+                    .font(Style.font(Style.Text.caption))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
         case .loading:
-            HStack(spacing: 6) {
+            HStack(spacing: Style.Space.x2) {
                 ProgressView().controlSize(.small).scaleEffect(0.7)
-                Text("Loading").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Loading").font(Style.font(Style.Text.caption)).foregroundStyle(.secondary)
             }
         case .installed:
             Text("Downloaded")
-                .font(.system(size: 11))
+                .font(Style.font(Style.Text.caption))
                 .foregroundStyle(.secondary)
         case .available:
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle").font(.system(size: 11))
-                Text("Download").font(.system(size: 11))
+            HStack(spacing: Style.Space.x1) {
+                Image(systemName: "arrow.down.circle").font(Style.font(Style.Text.caption))
+                Text("Download").font(Style.font(Style.Text.caption))
             }
             .foregroundStyle(.tertiary)
         case .failed:
             Text("Failed")
-                .font(.system(size: 11, weight: .semibold))
+                .font(Style.font(Style.Text.caption, .semibold))
                 .foregroundStyle(.red)
         }
     }

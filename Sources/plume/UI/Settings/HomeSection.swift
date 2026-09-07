@@ -2,7 +2,7 @@ import SwiftUI
 
 /// What plume is doing, and whether it can do it at all.
 ///
-/// The checks are `DoctorReport.run` — the same six the CLI prints — so there
+/// The checks are `DoctorReport.run`, the same six the CLI prints, so there
 /// is one answer to "is this set up", whichever way you ask.
 struct HomeSection: View {
     @ObservedObject var state: DaemonState
@@ -27,34 +27,34 @@ struct HomeSection: View {
             Divider().frame(height: 34)
             summaryItem("Model", value: modelText)
             Divider().frame(height: 34)
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: Style.Space.x1) {
                 HotkeyCaps(hotkey: state.hotkey)
                 Text("Hold to dictate")
-                    .font(.system(size: 11))
+                    .font(Style.font(Style.Text.caption))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, Style.Space.x5)
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, Style.Space.x4)
         .background(
             Color(nsColor: .controlBackgroundColor),
-            in: RoundedRectangle(cornerRadius: 10)
+            in: RoundedRectangle(cornerRadius: Style.Radius.btn)
         )
     }
 
     private func summaryItem(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Style.Space.x1) {
             Text(value)
-                .font(.system(size: 15, weight: .semibold))
+                .font(Style.font(Style.Text.title, .semibold))
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text(label)
-                .font(.system(size: 11))
+                .font(Style.font(Style.Text.caption))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18)
+        .padding(.horizontal, Style.Space.x5)
     }
 
     private var statusText: String {
@@ -125,22 +125,22 @@ private struct CheckRow: View {
     let onPurgeLegacyLogs: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Style.Space.x2) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(Style.font(Style.Glyph.md, .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 16)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Style.Space.x1) {
                 Text(headline)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Style.font(Style.Text.body, .medium))
                 if let remediation = check.remediation {
                     Text(remediation)
-                        .font(.system(size: 11))
+                        .font(Style.font(Style.Text.caption))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 10)
+            Spacer(minLength: Style.Space.x3)
             // The one remediation plume can carry out itself.
             if check.name == "legacy logs", isTrouble {
                 Button("Remove them", action: onPurgeLegacyLogs)
@@ -153,7 +153,7 @@ private struct CheckRow: View {
     private var headline: String {
         switch check.status {
         case .ok: return check.name
-        case .warn(let detail), .fail(let detail): return "\(check.name) — \(detail)"
+        case .warn(let detail), .fail(let detail): return "\(check.name): \(detail)"
         }
     }
 

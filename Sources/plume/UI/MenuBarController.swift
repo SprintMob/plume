@@ -78,7 +78,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit plume",
+            title: "Quit Plume",
             action: #selector(quitClicked),
             keyEquivalent: "q"
         )

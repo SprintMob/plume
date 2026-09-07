@@ -13,8 +13,8 @@ struct Setup: ParsableCommand {
         print("============")
         print()
         print("Plume needs two permissions:")
-        print("  1. Accessibility — to detect the Fn key globally and inject text at the cursor.")
-        print("  2. Microphone — to record audio while you hold Fn.")
+        print("  1. Accessibility, to detect the dictation key globally and type at the cursor.")
+        print("  2. Microphone, to record while you hold that key.")
         print()
         print("Both are granted to Plume itself, not to the terminal you run this from.")
         print()
@@ -38,7 +38,7 @@ struct Setup: ParsableCommand {
 
         print()
         print("  1. Toggle Plume on in the Accessibility list.")
-        print("  2. Re-run `plume setup` — macOS only picks up the grant on a fresh process.")
+        print("  2. Re-run `plume setup`. macOS only picks up the grant on a fresh process.")
         throw ExitCode(0)
     }
 
@@ -49,7 +49,7 @@ struct Setup: ParsableCommand {
             print("✓ microphone already granted")
             return
         case .denied, .restricted:
-            print("✗ microphone is denied — macOS won't re-prompt once denied.")
+            print("✗ microphone is denied. macOS will not ask again once it has been.")
             print("  opening Settings → Privacy & Security → Microphone...")
             openSettings("Privacy_Microphone")
             print("  enable Plume, then re-run `plume setup`.")

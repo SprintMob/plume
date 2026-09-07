@@ -63,7 +63,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "plume"
+        window.title = "Plume"
         // The sidebar's material runs up behind the traffic lights, the way
         // every macOS sidebar window looks.
         window.titleVisibility = .hidden
@@ -99,7 +99,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let main = NSMenu()
 
         let appItem = NSMenuItem()
-        let appMenu = NSMenu(title: "plume")
+        let appMenu = NSMenu(title: "Plume")
         appMenu.addItem(
             withTitle: "Settings…",
             action: #selector(showFromMenu),
@@ -107,11 +107,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         ).target = self
         appMenu.addItem(.separator())
         appMenu.addItem(
-            withTitle: "Hide plume",
+            withTitle: "Hide Plume",
             action: #selector(NSApplication.hide(_:)),
             keyEquivalent: "h")
         appMenu.addItem(
-            withTitle: "Quit plume",
+            withTitle: "Quit Plume",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
         appItem.submenu = appMenu

@@ -26,26 +26,26 @@ struct HistorySection: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Style.Space.x2) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
+                .font(Style.font(Style.Glyph.md))
                 .foregroundStyle(.secondary)
             TextField("Search history", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(Style.font(Style.Text.body))
             if !history.entries.isEmpty {
                 Button("Clear") {
                     history.clear()
                     query = ""
                 }
                 .buttonStyle(.link)
-                .font(.system(size: 12))
+                .font(Style.font(Style.Text.caption))
                 .help("Forget every dictation in this session")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 26)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Style.Space.x5)
+        .padding(.top, Style.Space.x6)
+        .padding(.bottom, Style.Space.x3)
     }
 
     @ViewBuilder
@@ -80,7 +80,7 @@ struct HistorySection: View {
                 ForEach(days) { day in
                     VStack(alignment: .leading, spacing: 7) {
                         Text(day.label)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Style.font(Style.Text.caption, .medium))
                             .foregroundStyle(.tertiary)
                             .padding(.leading, 4)
                         ForEach(day.entries) { entry in
@@ -102,31 +102,32 @@ struct HistorySection: View {
     /// Stated where the transcripts are, not buried in a settings row: it is
     /// the whole reason this section is allowed to exist.
     private var banner: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: Style.Space.x2) {
+            // Reassurance, not an accent.
             Image(systemName: "lock.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(Style.lime)
+                .font(Style.font(Style.Glyph.sm))
+                .foregroundStyle(.secondary)
             Text("Kept in memory only. Cleared when plume restarts, never written to disk.")
-                .font(.system(size: 11))
+                .font(Style.font(Style.Text.caption))
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Style.Space.x3)
+        .padding(.vertical, Style.Space.x2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             Color(nsColor: .controlBackgroundColor),
-            in: RoundedRectangle(cornerRadius: 8)
+            in: RoundedRectangle(cornerRadius: Style.Radius.sm)
         )
     }
 
     private func notice(symbol: String, title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Style.Space.x2) {
             Image(systemName: symbol)
-                .font(.system(size: 22))
+                .font(Style.font(Style.Glyph.xl))
                 .foregroundStyle(.tertiary)
-            Text(title).font(.system(size: 13, weight: .semibold))
+            Text(title).font(Style.font(Style.Text.body, .semibold))
             Text(detail)
-                .font(.system(size: 12))
+                .font(Style.font(Style.Text.caption))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 340)
@@ -146,26 +147,28 @@ private struct EntryCard: View {
             HStack(alignment: .top, spacing: 10) {
                 if entry.text.isEmpty {
                     Text("No speech found in this dictation")
-                        .font(.system(size: 13).italic())
+                        .font(Style.font(Style.Text.body).italic())
                         .foregroundStyle(.tertiary)
                 } else {
                     Text(entry.text)
-                        .font(.system(size: 13))
+                        .font(Style.font(Style.Text.body))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: Style.Space.x2)
+                // Transient feedback, gone in a second. Not worth the one
+                // lime element this surface is allowed.
                 Text(copied ? "Copied" : "")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Style.lime)
+                    .font(Style.font(Style.Text.caption))
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
+            .padding(.horizontal, Style.Space.x4)
+            .padding(.vertical, Style.Space.x3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 9)
+                in: RoundedRectangle(cornerRadius: Style.Radius.btn)
             )
             .contentShape(Rectangle())
         }
