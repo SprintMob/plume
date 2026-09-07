@@ -137,17 +137,14 @@ private struct OverlayPill: View {
 
     var body: some View {
         content
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.horizontal, Style.Space.x3)
+            .padding(.vertical, Style.Space.x2)
             .background(
                 Capsule()
-                    .fill(Style.background)
+                    .fill(Style.Dark.bg)
             )
             .scaleEffect(model.state == .hidden ? 0 : 1)
-            .animation(
-                .timingCurve(0.16, 1, 0.3, 1, duration: 0.3),
-                value: model.state
-            )
+            .animation(Style.Motion.entrance, value: model.state)
     }
 
     @ViewBuilder
@@ -157,10 +154,12 @@ private struct OverlayPill: View {
             Waveform(levels: model.levels)
                 .frame(width: 54, height: 22)
         case .locked:
-            HStack(spacing: 7) {
+            HStack(spacing: Style.Space.x2) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Style.accent)
+                    .font(Style.font(9, .semibold))
+                    // Not lime: the bars are already lime, and a second lime
+                    // element at another size dilutes the first.
+                    .foregroundStyle(Style.Dark.ink70)
                 Waveform(levels: model.levels)
                     .frame(width: 54, height: 22)
             }
@@ -176,7 +175,7 @@ private struct OverlayPill: View {
 
 private struct Waveform: View {
     let levels: [Float]
-    private let color = Style.accent
+    private let color = Style.lime
 
     var body: some View {
         HStack(alignment: .center, spacing: 4) {
@@ -186,7 +185,7 @@ private struct Waveform: View {
                     .frame(width: 2.5)
                     .frame(maxHeight: .infinity)
                     .scaleEffect(y: max(0.10, CGFloat(level)), anchor: .center)
-                    .animation(.easeOut(duration: 0.09), value: level)
+                    .animation(Style.Motion.level, value: level)
             }
         }
     }

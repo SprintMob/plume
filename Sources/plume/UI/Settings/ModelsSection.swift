@@ -92,7 +92,7 @@ private struct ModelRow: View {
                     if row.model.recommended {
                         Image(systemName: "star.fill")
                             .font(.system(size: 9))
-                            .foregroundStyle(Style.accent)
+                            .foregroundStyle(Style.lime)
                             .help("Recommended")
                     }
                     Text(row.model.displayName)
@@ -130,7 +130,7 @@ private struct ModelStatusLabel: View {
         case .active:
             Text("Active")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Style.accent)
+                .foregroundStyle(Style.lime)
         case .downloading(let fraction):
             HStack(spacing: 6) {
                 ProgressView(value: fraction)

@@ -105,7 +105,7 @@ struct HistorySection: View {
         HStack(spacing: 9) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 10))
-                .foregroundStyle(Style.accent)
+                .foregroundStyle(Style.lime)
             Text("Kept in memory only. Cleared when plume restarts, never written to disk.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -158,7 +158,7 @@ private struct EntryCard: View {
                 Spacer(minLength: 8)
                 Text(copied ? "Copied" : "")
                     .font(.system(size: 11))
-                    .foregroundStyle(Style.accent)
+                    .foregroundStyle(Style.lime)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 11)

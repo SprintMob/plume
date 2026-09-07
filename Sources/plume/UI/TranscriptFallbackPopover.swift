@@ -79,66 +79,66 @@ private struct TranscriptFallbackView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: Style.Space.x3) {
+            HStack(spacing: Style.Space.x2) {
                 Image(systemName: "text.cursor")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Style.accent)
+                    .font(Style.font(Style.Text.body, .semibold))
+                    .foregroundStyle(Style.lime)
 
                 Text("No text field selected")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(Style.font(Style.Text.body, .semibold))
+                    .foregroundStyle(Style.Dark.ink)
 
                 Spacer()
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Style.font(Style.Text.caption, .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.65))
+                .foregroundStyle(Style.Dark.ink70)
                 .help("Dismiss")
             }
 
             Text(transcript)
-                .font(.system(size: 13))
-                .foregroundStyle(.white)
+                .font(Style.font(Style.Text.body))
+                .foregroundStyle(Style.Dark.ink)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                 .textSelection(.enabled)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Style.Space.x3)
+                .padding(.vertical, Style.Space.x2)
                 .background(
-                    Color.white.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 10)
+                    Style.Dark.lineSoft,
+                    in: RoundedRectangle(cornerRadius: Style.Radius.btn)
                 )
 
             HStack {
                 Text("Copied \u{2014} press \u{2318}V where you want it.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .font(Style.font(Style.Text.caption))
+                    .foregroundStyle(Style.Dark.ink70)
 
                 Spacer()
 
                 Button(action: onCopy) {
                     Label("Copy again", systemImage: "doc.on.doc")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Style.font(Style.Glyph.md, .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Style.background)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .foregroundStyle(Style.onLime)
+                .padding(.horizontal, Style.Space.x3)
+                .padding(.vertical, Style.Space.half * 3)
                 .background(
-                    Style.accent,
+                    Style.lime,
                     in: Capsule()
                 )
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Style.Space.x4)
         .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Style.background)
+            RoundedRectangle(cornerRadius: Style.Radius.lg + 2)
+                .fill(Style.Dark.bg)
         )
     }
 }

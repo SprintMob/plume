@@ -122,13 +122,14 @@ struct KeyCap: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 11, weight: .medium, design: .rounded))
-            .monospacedDigit()
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
+            // `design: .rounded` was SF Rounded, a second typeface in a single
+            // control. It is gone, and the app now has exactly one.
+            .font(Style.number(Style.Text.caption, .medium))
+            .padding(.horizontal, Style.Space.half * 3)
+            .padding(.vertical, Style.Space.half + 1)
             .background(
                 Color(nsColor: .quaternaryLabelColor).opacity(0.55),
-                in: RoundedRectangle(cornerRadius: 5)
+                in: RoundedRectangle(cornerRadius: Style.Radius.xs - 1)
             )
     }
 }
