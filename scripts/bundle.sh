@@ -66,6 +66,13 @@ plutil -lint "$APP/Contents/Info.plist" > /dev/null
 # the bundle, and it checks Bundle.main.resourceURL first. Shipping the bare
 # binary, which is what happened until now, left a latent crash on every path
 # that falls back to the packaged configs.
+# Apache-2.0 section 4 requires the licence and any NOTICE to travel with
+# distributions in source *or object* form, and a statically linked binary is
+# object form. Two of the three dependencies are Apache-2.0, so this file is an
+# obligation attached to the release artefact, not a courtesy. Regenerate it
+# with scripts/third-party.sh.
+cp THIRD-PARTY.md "$APP/Contents/Resources/ACKNOWLEDGEMENTS.txt"
+
 # Committed rather than generated at build time: a contributor on a clean
 # checkout should get an app with an icon without installing librsvg.
 # scripts/make-icns.sh regenerates it when the SVG sources change.

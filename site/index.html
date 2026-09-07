@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plume, dictation for macOS</title>
+<meta name="description" content="Hold a key, speak, release. The text is at your cursor in under 500 ms, and the audio never left the Mac.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta property="og:title" content="Plume">
+<meta property="og:description" content="Hold a key, speak, release. On-device dictation for macOS, by SprintMob.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://plume.sprintmob.com/">
+<style>
+  /* Euclid Circular B is the SprintMob face, and it is not served here: no web
+     licence has been established, and this page is public. The system stack is
+     the honest fallback and costs nothing at these sizes. */
+  :root {
+    --bg: #0A0A0A;
+    --elev: #121212;
+    --ink: #F7F8F3;
+    --ink-70: rgba(247, 248, 243, 0.72);
+    --ink-45: rgba(247, 248, 243, 0.50);
+    --line: rgba(247, 248, 243, 0.14);
+    --lime: #E0FE75;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 17px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 96px 24px 64px;
+  }
+  .mark { width: 72px; height: 72px; display: block; margin-bottom: 32px; }
+  h1 {
+    font-size: 56px;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .lede { font-size: 21px; line-height: 1.5; color: var(--ink-70); margin: 0 0 40px; max-width: 34em; }
+  /* The command is the point of the page. It is the largest interactive thing
+     on it, and clicking it copies. */
+  .command {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    background: var(--elev);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    color: var(--ink);
+    font: 400 15px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .command:hover, .command:focus-visible { border-color: var(--lime); outline: none; }
+  .command code { flex: 1; white-space: pre-wrap; word-break: break-word; }
+  .command .hint { color: var(--ink-45); font-size: 13px; flex-shrink: 0; }
+  .command[data-copied="true"] .hint { color: var(--lime); }
+  .req { color: var(--ink-45); font-size: 15px; margin: 16px 0 56px; }
+  figure { margin: 0 0 56px; }
+  figure img { width: 100%; border-radius: 16px; border: 1px solid var(--line); display: block; }
+  figure.placeholder > div {
+    aspect-ratio: 16 / 9;
+    border-radius: 16px;
+    border: 1px dashed var(--line);
+    display: grid;
+    place-items: center;
+    color: var(--ink-45);
+    font-size: 15px;
+  }
+  figcaption { color: var(--ink-45); font-size: 14px; margin-top: 12px; }
+  h2 { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-45); font-weight: 600; margin: 0 0 16px; }
+  p { margin: 0 0 20px; color: var(--ink-70); }
+  p strong { color: var(--ink); font-weight: 600; }
+  section { margin-bottom: 56px; }
+  a { color: var(--ink); text-decoration-color: var(--line); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--lime); }
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+    color: var(--ink-45);
+    font-size: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: space-between;
+  }
+  @media (max-width: 640px) {
+    main { padding: 56px 20px 48px; }
+    h1 { font-size: 40px; }
+    .lede { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+    <rect x="100" y="100" width="824" height="824" rx="185.4" fill="#0A0A0A"/>
+    <rect x="102" y="102" width="820" height="820" rx="183.4" fill="none" stroke="#F7F8F3" stroke-opacity="0.14" stroke-width="4"/>
+    <g transform="translate(220.07,220.08) scale(36.49)" fill="#E0FE75">
+      <path d="M5 7L9 3H15V7H5Z"/>
+      <path d="M1 9H11L7 13H1V9Z"/>
+    </g>
+  </svg>
+
+  <h1>Plume</h1>
+  <p class="lede">Hold a key, speak, release. The text is at your cursor in
+  under 500&nbsp;ms, and the audio never left the Mac.</p>
+
+  <button class="command" id="copy" type="button">
+    <code>curl -fsSL https://plume.sprintmob.com/install.sh | sh</code>
+    <span class="hint" id="hint">copy</span>
+  </button>
+  <p class="req">macOS 14 or later, Apple Silicon. Transcription runs on the
+  Neural Engine, so Intel Macs are not supported.</p>
+
+  <!-- Replace this whole <figure> with the GIF when it exists:
+         <img src="demo.gif" alt="The dictation pill appearing at the bottom of
+         the screen, five lime bars moving with the voice, then text arriving in
+         a text field.">
+       Record it before announcing the page anywhere. It is what people look at
+       first, and a placeholder is not a substitute. -->
+  <figure class="placeholder">
+    <div>Demo recording goes here</div>
+    <figcaption>Dictating into Messages. The pill is the whole interface.</figcaption>
+  </figure>
+
+  <section>
+    <h2>What it is</h2>
+    <p>A dictation daemon that lives in the menu bar. Hold <strong>fn</strong>,
+    talk, let go, and the transcript is typed where your cursor is. Double-tap
+    to keep recording without holding.</p>
+    <p><strong>Transcription happens on this Mac.</strong> There is no account,
+    no API key and no network call, because the model runs on the Apple Neural
+    Engine. <strong>No transcript is written to disk</strong>, ever: the session
+    history is in memory and dies with the process.</p>
+    <p>The app is 7&nbsp;MB. It has one key, and the settings window exposes
+    nothing the daemon could not already do.</p>
+  </section>
+
+  <section>
+    <h2>Honestly</h2>
+    <p>Plume is not notarized yet, so a build downloaded through a browser is
+    blocked by Gatekeeper and every update costs you the Accessibility
+    permission until you re-grant it. The installer above does not go through a
+    browser, so it is not affected. The
+    <a href="https://github.com/sprintmob/plume#plume-is-not-notarized">README
+    explains both</a> rather than hiding them.</p>
+    <p>Most of the code was written by people who opened pull requests against
+    <a href="https://github.com/digimata/parrot">the project this forks</a> and
+    never got a review. They are named in the
+    <a href="https://github.com/sprintmob/plume/blob/main/NOTICE">NOTICE</a>.</p>
+  </section>
+
+  <footer>
+    <span>By <a href="https://sprintmob.com">SprintMob</a>. MIT licensed.</span>
+    <span><a href="https://github.com/sprintmob/plume">Source on GitHub</a></span>
+  </footer>
+</main>
+
+<script>
+  // Progressive enhancement: with JS off, the command is still readable and
+  // selectable, which is all it has to be.
+  const button = document.getElementById("copy");
+  const hint = document.getElementById("hint");
+  button.addEventListener("click", async () => {
+    const command = button.querySelector("code").textContent;
+    try {
+      await navigator.clipboard.writeText(command);
+      button.dataset.copied = "true";
+      hint.textContent = "copied";
+      setTimeout(() => {
+        button.dataset.copied = "false";
+        hint.textContent = "copy";
+      }, 1600);
+    } catch {
+      hint.textContent = "select and copy";
+    }
+  });
+</script>
+</body>
+</html>

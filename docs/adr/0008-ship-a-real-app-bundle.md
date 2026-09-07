@@ -31,16 +31,27 @@ permissions, appears under its own name in System Settings, and keeps the grant
 when you change terminals. That is a functional defect fixed, and it is what
 pays for the packaging work.
 
-Two smaller things fall out for free, and neither would have justified the
+One smaller thing falls out for free, and it would not have justified the
 change alone. `NSMicrophoneUsageDescription` becomes expressible, which it has
 to be: a bundled app that calls `AVCaptureDevice.requestAccess(for: .audio)`
 without that key is killed outright by TCC, and today it only works because the
-terminal owns the grant. And `Contents/Resources/` gives the two SwiftPM
-resource bundles somewhere to live. `swift-transformers_Hub.bundle` holds
-tokenizer configs that `Bundle.module` loads with a generated accessor that
-calls `fatalError` when it cannot find them; the bare
-`/usr/local/bin/plume` shipped without it, which was a latent crash on every
-path that falls back to the packaged configs.
+terminal owns the grant.
+
+> **Correction, 2026-09-07.** This section originally claimed a second free
+> win: that `Contents/Resources/` finally gave the two SwiftPM resource
+> bundles, `swift-crypto_Crypto.bundle` and `swift-transformers_Hub.bundle`, a
+> home, fixing a latent `fatalError` on any path that reads the packaged
+> tokenizer configs through `Bundle.module`. **That was wrong.** Those two
+> directories were stale artefacts in `.build`, dated 2026-08-24, left by an
+> older revision of `argmax-oss-swift` that took swift-crypto and
+> swift-transformers as separate packages. It now vendors that code under
+> `Sources/ArgmaxCore/External`, and `swift package show-dependencies` resolves
+> to exactly three packages. Deleting the two directories and rebuilding
+> produces none: this dependency graph emits no resource bundle at all, and
+> nothing in the linked targets calls `Bundle.module`. `bundle.sh` still copies
+> any `*.bundle` it finds, which costs a four-line loop and is correct the day
+> a dependency does ship one. The claim is retracted; the argument for the
+> bundle was never resting on it.
 
 ## The honest corollary
 

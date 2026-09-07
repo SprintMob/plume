@@ -40,6 +40,13 @@ Plume.app/
     _CodeSignature/                          écrit par codesign
 ```
 
+> **Corrigé à l'exécution, 2026-09-07 :** ce qui suit était mesuré sur des
+> artefacts périmés de `.build`, datés du 2026-08-24.
+> `swift package show-dependencies` rend trois paquets, aucun n'émet de bundle
+> de ressources, et rien dans les cibles liées n'appelle `Bundle.module`.
+> `bundle.sh` garde la boucle de copie pour le jour où ça change. Détail dans
+> [ADR-0008](../adr/0008-ship-a-real-app-bundle.md).
+
 **Les deux bundles de ressources SwiftPM ne sont pas optionnels.**
 `swift-transformers_Hub.bundle` contient des **données d'exécution**, les
 configs de tokenizer, que swift-transformers cherche via `Bundle.module`, dont

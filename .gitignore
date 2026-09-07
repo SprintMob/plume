@@ -7,3 +7,4 @@
 # kdb auto-rendered task index (regenerate with `kdb render`)
 .tasks/
 dist/
+site/install.sh

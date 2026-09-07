@@ -1,0 +1,42 @@
+Plume
+Copyright (c) 2026 SprintMob
+
+This product includes software originally developed as `parrot` by Andrew Jones
+(https://github.com/digimata/parrot), licensed under the MIT License. See LICENSE.
+
+Substantial parts of this codebase originate in pull requests opened against
+digimata/parrot and merged here without their authors' involvement:
+
+  andredezzy      #12 #13 #14 #19 #20 #21 #23 #25
+  vipergsm        #17 #18
+  justinhnaylor   #16 #24
+  Entrepenulian   #4
+  augiefra        #5
+  tomiiide        #10
+  imtamiliniyan   #27
+  L65FREAD        #9
+  bdeol2          #11 (closed as a duplicate of #12; its TCC analysis was used)
+
+Eight authors have code in this tree. bdeol2 is listed separately because the
+analysis was used and the patch was not; crediting nine would overstate it, and
+crediting the twenty-five people who opened a pull request upstream would
+overstate it further. What each contributed, and why it was chosen over the
+alternatives, is recorded in docs/adr/0002-merge-upstream-prs-in-waves.md and
+the .scratch/vague-*/ specs.
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+Plume links the following, statically, into the binary inside Plume.app. Their
+full licence texts are in THIRD-PARTY.md, which is also shipped inside the app
+as Contents/Resources/ACKNOWLEDGEMENTS.txt.
+
+  swift-argument-parser  Apache-2.0  Copyright the Swift project authors
+  argmax-oss-swift       MIT         Copyright (c) 2024 argmax, inc.
+  FluidAudio             Apache-2.0  Copyright FluidInference
+
+argmax-oss-swift vendors code derived from huggingface/swift-transformers
+(Apache-2.0, Copyright 2022 Hugging Face SAS) under Sources/ArgmaxCore/External;
+its own NOTICES file carries that attribution and is reproduced in
+THIRD-PARTY.md.
