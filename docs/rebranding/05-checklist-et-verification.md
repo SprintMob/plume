@@ -1,5 +1,10 @@
 # Checklist, questions ouvertes, vérification
 
+Cette checklist est le protocole initial, conservé pour la trace des décisions.
+Les cases ne reflètent pas l'avancement actuel ; voir le
+[statut du programme](./README.md#avancement-au-2026-09-24). Les contrôles sur
+compte macOS standard et les alias mail restent bloquants pour la publication.
+
 ## Checklist branding
 
 Ce qui demande une action ou une décision de l'utilisateur est marqué **(vous)**.

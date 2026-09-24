@@ -62,57 +62,26 @@ qui collisionnent avec des binaires système), aucune formule Homebrew `plume`
 | [04-vitrine-et-licence.md](./04-vitrine-et-licence.md) | La page, le README, l'attribution, les obligations tierces |
 | [05-checklist-et-verification.md](./05-checklist-et-verification.md) | La checklist actionnable, les questions ouvertes, ce qui n'est pas fait, le protocole de vérification |
 
-## Par où commencer
+## Avancement au 2026-09-24
 
-### Étape zéro, bloquante
+Les étapes c0 à c8 sont implémentées sur `rebranding-plume`. Le bundle,
+l'installeur utilisateur, la migration explicite, les tokens, le chrome, la
+fenêtre de réglages, l'attribution et la page sont dans la branche. Les 94 tests,
+le build release, l'assemblage, `plutil`, `codesign`, `check-rename.sh` et la
+validation des workflows passent localement.
 
-`Tests/parrotTests/FnDictationGestureTests.swift` est modifié et non commité :
-116 lignes de tests pour une feature Escape-cancel jamais implémentée.
-**`swift build --build-tests` échoue aujourd'hui**, donc rien n'est vérifiable
-tant que ce fichier est là.
+Restent avant l'ouverture du dépôt :
 
-Ce sont de bons tests, écrits en TDD. On les sort en enregistrant leur intention
-dans `.scratch/annulation-echap/spec.md` plutôt qu'en les jetant. Détail dans
-[01](./01-etat-des-lieux.md#le-blocage-préalable).
+1. Une capture réelle de dictée pour remplacer les placeholders du README et
+   de la page, et la revue visuelle des états en apparence claire et sombre.
+2. L'installation d'une préversion depuis GitHub sur un compte macOS standard,
+   avec Microphone, Accessibilité, LaunchAgent, double-clic et migration vérifiés.
+3. La réception effective des messages par `security@sprintmob.com` et
+   `conduct@sprintmob.com`. Les alias doivent encore être créés.
+4. Ensuite seulement : dépôt public `sprintmob/plume`, Pages et DNS, puis
+   release stable et nouvel essai depuis l'URL publique.
 
-### L'ordre du travail
-
-La convention du repo est un répertoire `.scratch/<slug>/` par feature, un
-commit par feature, chacun vérifié seul.
-
-| # | Slug | Contenu | Pourquoi à cette place |
-|---|---|---|---|
-| c0 | `annulation-echap` | Sortir les tests Escape-cancel, enregistrer leur intention | Rien n'est vérifiable avant |
-| c1 | `renommage-plume` | Renommage mécanique : répertoires, `@main`, `Package.swift`, ~60 chaînes, docs tournés vers l'avant | Tout le reste écrit du code dans ces fichiers |
-| c2 | `paquet-app` | `bundle.sh`, `Info.plist.in`, résolution du binaire, shim CLI, `Doctor`. Plus **ADR-0008** | |
-| c3 | `migration-parrot-plume` | Les six déplacements, les préférences, la détection par `doctor` | Après c2 : elle a besoin de savoir où le paquet s'installe |
-| c4 | `signature-et-distribution` | `install-local.sh`, `release.yml`, `install.sh`, **et la CI de tests qui manque** | |
-| c5 | `les-tokens` | `Style` remplacé, **sans changement visuel volontaire** | Un commit de pure substitution se relit |
-| c6 | `le-chrome` | Bulle, états erreur et annulation, panneau de repli, glyphe, icône | Consomme c5 et l'emplacement de ressources de c2 |
-| c7 | `la-fenetre` | Fenêtre de réglages sur les tokens, sidebar, copie | |
-| c8 | `marque-sprintmob` | LICENSE, NOTICE, lignée du README, glossaire, notices tierces, page | En dernier : elle montre le résultat, donc elle a besoin de captures qui existent |
-
-**c1 et c2 restent séparés** alors qu'ils pourraient fusionner : c1 est 53
-fichiers de changement mécanique qui doit se relire en diagonale, c2 est six
-fichiers de vraies décisions. Mélangés, ni l'un ni l'autre n'est relisable.
-C'est l'argument qu'ADR-0002 fait déjà sur l'ordre des waves.
-
-**c5 avant c6** pour la même raison : une substitution de tokens sans intention
-visuelle se révise, un redesign mêlé à une substitution ne se révise pas.
-
-Note sur c1 : il n'existe **aucun état intermédiaire qui compile** à
-l'intérieur, puisque SwiftPM déduit le chemin des sources du nom de la cible.
-La garantie porte sur la frontière du commit, et l'issue doit le dire au lieu de
-faire semblant.
-
-## Ce que ce dossier n'est pas
-
-Ce n'est pas une spec au sens du repo. Les specs vivent dans `.scratch/<slug>/`
-et se rédigent au moment d'exécuter chaque feature, avec leurs issues numérotées.
-Ce dossier est le niveau au-dessus : le programme, les décisions et leurs
-arguments, pour que les huit specs puissent être écrites sans re-instruire le
-sujet.
-
-ADR-0008 n'est pas écrit non plus. Il se rédige avec c2, comme ADR-0004 et
-ADR-0007 ont été écrits avec leur feature. Son cadrage est dans
-[03](./03-paquet-et-renommage.md#ce-quadr-0008-doit-tenir).
+Les autres fichiers de ce dossier conservent le raisonnement initial et peuvent
+décrire des étapes au futur. Les commandes et chemins actuels sont dans le
+[README](../../README.md), [l'ADR-0008](../adr/0008-ship-a-real-app-bundle.md)
+et les scripts.
