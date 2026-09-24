@@ -1,9 +1,9 @@
 # parrot → plume : rebranding SprintMob et passage en open source
 
-**Statut : rebranding implémenté sur `rebranding-plume`, publication en attente.**
-Ce dossier conserve les décisions et les critères de vérification. Les étapes de
-code sont achevées ; la validation sur compte standard, la démonstration et la
-mise en ligne restent à confirmer avant l'annonce.
+**Statut : rebranding implémenté sur `rebranding-plume`, publication autorisée
+avant les essais manuels.** Ce dossier conserve les décisions et les critères de
+vérification. Les étapes de code sont achevées ; la validation sur compte
+standard et la démonstration seront faites après la mise en ligne.
 
 Rédigé le 2026-09-03, à partir de `main` @ `0dd69e9`.
 
@@ -70,16 +70,16 @@ fenêtre de réglages, l'attribution et la page sont dans la branche. Les 94 tes
 le build release, l'assemblage, `plutil`, `codesign`, `check-rename.sh` et la
 validation des workflows passent localement.
 
-Restent avant l'ouverture du dépôt :
+Restent à faire après la publication, conformément à la décision du 2026-09-24 :
 
-1. Une capture réelle de dictée pour remplacer les placeholders du README et
-   de la page, et la revue visuelle des états en apparence claire et sombre.
+1. Une capture réelle de dictée pour le README et la page, et la revue visuelle
+   des états en apparence claire et sombre. Les placeholders ont été retirés.
 2. L'installation d'une préversion depuis GitHub sur un compte macOS standard,
    avec Microphone, Accessibilité, LaunchAgent, double-clic et migration vérifiés.
-3. La réception effective des messages par `security@sprintmob.com` et
-   `conduct@sprintmob.com`. Les alias doivent encore être créés.
-4. Ensuite seulement : dépôt public `sprintmob/plume`, Pages et DNS, puis
-   release stable et nouvel essai depuis l'URL publique.
+3. La création des alias `security@sprintmob.com` et `conduct@sprintmob.com`,
+   puis un test de réception. Leur absence est connue au moment de publier.
+4. Un essai d'installation depuis l'URL publique. Si la signature ad hoc
+   échoue, passer à Developer ID et à la notarisation.
 
 Les autres fichiers de ce dossier conservent le raisonnement initial et peuvent
 décrire des étapes au futur. Les commandes et chemins actuels sont dans le

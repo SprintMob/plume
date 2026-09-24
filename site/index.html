@@ -68,18 +68,6 @@
   .command .hint { color: var(--ink-45); font-size: 13px; flex-shrink: 0; }
   .command[data-copied="true"] .hint { color: var(--lime); }
   .req { color: var(--ink-45); font-size: 15px; margin: 16px 0 56px; }
-  figure { margin: 0 0 56px; }
-  figure img { width: 100%; border-radius: 16px; border: 1px solid var(--line); display: block; }
-  figure.placeholder > div {
-    aspect-ratio: 16 / 9;
-    border-radius: 16px;
-    border: 1px dashed var(--line);
-    display: grid;
-    place-items: center;
-    color: var(--ink-45);
-    font-size: 15px;
-  }
-  figcaption { color: var(--ink-45); font-size: 14px; margin-top: 12px; }
   h2 { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-45); font-weight: 600; margin: 0 0 16px; }
   p { margin: 0 0 20px; color: var(--ink-70); }
   p strong { color: var(--ink); font-weight: 600; }
@@ -119,22 +107,11 @@
   under 500&nbsp;ms, and the audio never left the Mac.</p>
 
   <button class="command" id="copy" type="button">
-    <code>curl -fsSL https://plume.sprintmob.com/install.sh | sh</code>
+    <code>curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh</code>
     <span class="hint" id="hint">copy</span>
   </button>
   <p class="req">macOS 14 or later, Apple Silicon. Transcription runs on the
   Neural Engine, so Intel Macs are not supported.</p>
-
-  <!-- Replace this whole <figure> with the GIF when it exists:
-         <img src="demo.gif" alt="The dictation pill appearing at the bottom of
-         the screen, five lime bars moving with the voice, then text arriving in
-         a text field.">
-       Record it before announcing the page anywhere. It is what people look at
-       first, and a placeholder is not a substitute. -->
-  <figure class="placeholder">
-    <div>Demo recording goes here</div>
-    <figcaption>Dictating into Messages. The pill is the whole interface.</figcaption>
-  </figure>
 
   <section>
     <h2>What it is</h2>

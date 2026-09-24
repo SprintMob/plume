@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Plume installer.
-#   curl -fsSL https://plume.sprintmob.com/install.sh | sh
-#   curl -fsSL https://plume.sprintmob.com/install.sh | sh -s -- --tag v0.1.0-rc.1
+#   curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh -s -- --tag v0.1.0-rc.1
 #
 # Fetches the latest stable arm64 macOS build (or an explicit release tag),
 # installs ~/Applications/Plume.app and ~/.local/bin/plume without admin rights,

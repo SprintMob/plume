@@ -6,16 +6,13 @@ Hold a key, speak, release. The text is at your cursor in under 500 ms, and the
 audio never left the Mac.
 
 ```sh
-curl -fsSL https://plume.sprintmob.com/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh
 "$HOME/.local/bin/plume" setup
 ```
 
 A macOS dictation daemon by [SprintMob](https://sprintmob.com). On-device
 transcription on the Apple Neural Engine, no account, no network call, no
 transcript written to disk.
-
-> **A demo GIF of the pill goes here.** It is the thing people look at first.
-> Record one before announcing this anywhere.
 
 **Requires:** macOS 14 or later on Apple Silicon. Transcription runs on the
 Apple Neural Engine via CoreML, so the installer refuses to run on Intel.
@@ -28,7 +25,7 @@ to your `PATH` yourself. Read the script before you pipe it to a shell.
 To install a test release, pass its tag explicitly:
 
 ```sh
-curl -fsSL https://plume.sprintmob.com/install.sh | sh -s -- --tag v0.1.0-rc.1
+curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh -s -- --tag v0.1.0-rc.1
 ```
 
 Without `--tag`, the installer selects the latest stable release.
