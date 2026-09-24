@@ -1,9 +1,9 @@
 # parrot → plume : rebranding SprintMob et passage en open source
 
-**Statut : rebranding implémenté sur `rebranding-plume`, publication autorisée
-avant les essais manuels.** Ce dossier conserve les décisions et les critères de
-vérification. Les étapes de code sont achevées ; la validation sur compte
-standard et la démonstration seront faites après la mise en ligne.
+**Statut : publié sur `SprintMob/plume` avec `v0.1.0`, essais manuels reportés.**
+Ce dossier conserve les décisions et les critères de vérification. Le dépôt,
+la release et la page GitHub Pages sont publics ; la validation sur compte
+standard et la démonstration seront faites ensuite.
 
 Rédigé le 2026-09-03, à partir de `main` @ `0dd69e9`.
 
@@ -77,9 +77,13 @@ Restent à faire après la publication, conformément à la décision du 2026-09
 2. L'installation d'une préversion depuis GitHub sur un compte macOS standard,
    avec Microphone, Accessibilité, LaunchAgent, double-clic et migration vérifiés.
 3. La création des alias `security@sprintmob.com` et `conduct@sprintmob.com`,
-   puis un test de réception. Leur absence est connue au moment de publier.
+   puis un test de réception. Le signalement privé GitHub sert de canal
+   provisoire.
 4. Un essai d'installation depuis l'URL publique. Si la signature ad hoc
    échoue, passer à Developer ID et à la notarisation.
+5. Le CNAME Cloudflare `plume → sprintmob.github.io`, puis le domaine
+   personnalisé et HTTPS dans GitHub Pages. La page reste accessible à
+   `https://sprintmob.github.io/plume/` en attendant.
 
 Les autres fichiers de ce dossier conservent le raisonnement initial et peuvent
 décrire des étapes au futur. Les commandes et chemins actuels sont dans le

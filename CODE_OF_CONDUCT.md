@@ -23,8 +23,10 @@ someone is representing the project.
 
 ## Enforcement
 
-Report to **conduct@sprintmob.com**. Reports stay between you and the
-maintainers. Responses run from a private word through to a permanent ban, and
-whoever handles a report will say which one they chose and why.
+Until `conduct@sprintmob.com` is active, send a report through
+[GitHub's private reporting channel](https://github.com/SprintMob/plume/security/advisories)
+with **Conduct report** at the start of the title. Reports stay between you and
+the maintainers. Responses run from a private word through to a permanent ban,
+and whoever handles a report will say which one they chose and why.
 
 Maintainers who do not hold to this are held to it harder, not less.

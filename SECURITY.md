@@ -2,7 +2,9 @@
 
 ## Reporting
 
-Email **security@sprintmob.com**. Do not open a public issue.
+Use [GitHub's private vulnerability reporting](https://github.com/SprintMob/plume/security/advisories).
+Do not open a public issue. The `security@sprintmob.com` alias will be added
+here after it is active and tested.
 
 Tell us what you can reproduce, on which macOS version, and what an attacker
 gets. We will confirm receipt within three working days and tell you what we
