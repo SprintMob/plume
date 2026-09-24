@@ -14,6 +14,8 @@ jobs:
     name: build and sign Plume.app
     runs-on: macos-15
     timeout-minutes: 30
+    env:
+      HAS_SIGNING_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +49,7 @@ jobs:
       # turning it on later is adding two secrets rather than rewriting this
       # file. Until then the release is ad-hoc signed and the README says so.
       - name: import the Developer ID certificate
-        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        if: env.HAS_SIGNING_CERTIFICATE == 'true'
         env:
           CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -64,7 +66,7 @@ jobs:
           rm -f /tmp/certificate.p12
 
       - name: sign and notarize
-        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        if: env.HAS_SIGNING_CERTIFICATE == 'true'
         env:
           SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
           NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
@@ -101,3 +103,4 @@ jobs:
             dist/plume-macos-arm64.zip.sha256
           generate_release_notes: true
           fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-rc') }}

@@ -2,8 +2,8 @@
 #
 # scripts/install.sh is copied in at deploy time rather than committed under
 # site/, so the file people pipe into a shell and the file in the repo cannot
-# drift. The CNAME follows the aws.sprintmob.com precedent: its own project,
-# its own record, no interaction with www, which is still on Framer.
+# drift. Configure the custom domain in GitHub Pages settings and DNS; this
+# GitHub Actions deployment does not need a site/CNAME file.
 name: pages
 
 on:

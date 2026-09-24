@@ -7,7 +7,7 @@ audio never left the Mac.
 
 ```sh
 curl -fsSL https://plume.sprintmob.com/install.sh | sh
-plume setup
+"$HOME/.local/bin/plume" setup
 ```
 
 A macOS dictation daemon by [SprintMob](https://sprintmob.com). On-device
@@ -20,10 +20,18 @@ transcript written to disk.
 **Requires:** macOS 14 or later on Apple Silicon. Transcription runs on the
 Apple Neural Engine via CoreML, so the installer refuses to run on Intel.
 
-The installer puts `Plume.app` in `/Applications` and writes
-`/usr/local/bin/plume`, three lines that run the binary inside it. Read the
-script before you pipe it to a shell; it does what it says here and nothing
-else.
+The installer puts `Plume.app` in `~/Applications` and writes a three-line CLI
+shim at `~/.local/bin/plume`. It needs no administrator password and does not
+change your shell profile. Use the full path shown above, or add `~/.local/bin`
+to your `PATH` yourself. Read the script before you pipe it to a shell.
+
+To install a test release, pass its tag explicitly:
+
+```sh
+curl -fsSL https://plume.sprintmob.com/install.sh | sh -s -- --tag v0.1.0-rc.1
+```
+
+Without `--tag`, the installer selects the latest stable release.
 
 ## Lineage
 
@@ -49,7 +57,7 @@ signature. Two consequences, and neither is hidden:
    macOS says about any app it cannot verify. The `curl … | sh` installer above
    does not go through a browser, so nothing is quarantined and this does not
    happen. If you did download it by hand:
-   `xattr -dr com.apple.quarantine /Applications/Plume.app`.
+   `xattr -dr com.apple.quarantine "$HOME/Applications/Plume.app"`.
 2. **Every update costs you the Accessibility grant.** An ad-hoc signature is
    anchored to the exact bytes of the build, so macOS treats each release as a
    different application. After updating, Plume will still record and
@@ -147,6 +155,12 @@ plume --inject-mode type-unicode      # type the text instead of pasting it
 plume --mute-output                   # mute system audio while recording
 plume --no-overlay                    # disable the bottom-of-screen pill
 ```
+
+`plume install --uninstall` stops and removes the LaunchAgent, then prints the
+absolute paths of any app, shim, or downloaded models still on disk. If you
+have not added `~/.local/bin` to your `PATH`, run
+`"$HOME/.local/bin/plume" install --uninstall` instead. Removing the models is
+optional; keep them if you plan to reinstall.
 
 ### Non-Apple keyboards
 

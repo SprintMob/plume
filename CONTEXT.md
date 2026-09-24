@@ -146,7 +146,7 @@ _Avoid_: the app, the package (the first is ambiguous with the daemon, the secon
 is the SwiftPM package)
 
 **CLI shim**:
-`/usr/local/bin/plume` — three lines that `exec` the executable inside the bundle.
+`~/.local/bin/plume` — three lines that `exec` the executable inside the bundle.
 Not a symlink: `Bundle.main` does not resolve through one, so a symlinked `plume`
 would read a different preferences domain than the daemon. The launch agent points
 at neither, always at the path inside the bundle.

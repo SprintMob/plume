@@ -2,9 +2,10 @@
 
 ## La page d'atterrissage
 
-`aws.sprintmob.com` donne le précédent : projet séparé, CNAME indépendant, aucune
-interaction avec `www` qui est encore sur Framer. `plume.sprintmob.com` suit le
-même schéma, donc aucun risque de bascule ni de conflit de certificat.
+`aws.sprintmob.com` donne le précédent : projet séparé, sous-domaine indépendant,
+aucune interaction avec `www` qui est encore sur Framer. Le domaine personnalisé
+se configure dans GitHub Pages et dans le DNS, sans fichier `site/CNAME` dans ce
+déploiement GitHub Actions.
 
 Note à trancher côté DNS : le profil GitHub de l'org annonce `www.sprintmob.fr`
 tandis que le blueprint du site vise `sprintmob.com`. Le domaine retenu ici est
@@ -64,7 +65,7 @@ est faux :
 >    what macOS says about any app it cannot verify. The `curl … | sh` installer
 >    above does not go through a browser, so nothing is quarantined and this does
 >    not happen. If you did download it by hand:
->    `xattr -dr com.apple.quarantine /Applications/Plume.app`.
+>    `xattr -dr com.apple.quarantine "$HOME/Applications/Plume.app"`.
 > 2. **Every update costs you the Accessibility grant.** An ad-hoc signature is
 >    anchored to the exact bytes of the build, so macOS treats each release as a
 >    different application. After updating, Plume will still record and

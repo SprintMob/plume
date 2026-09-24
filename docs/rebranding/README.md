@@ -1,8 +1,9 @@
 # parrot → plume : rebranding SprintMob et passage en open source
 
-**Statut : planifié, non commencé.** Aucune ligne de code n'a bougé. Ce dossier
-est le dossier de reprise : il contient les décisions prises, ce qui a été
-mesuré, et l'ordre dans lequel exécuter.
+**Statut : rebranding implémenté sur `rebranding-plume`, publication en attente.**
+Ce dossier conserve les décisions et les critères de vérification. Les étapes de
+code sont achevées ; la validation sur compte standard, la démonstration et la
+mise en ligne restent à confirmer avant l'annonce.
 
 Rédigé le 2026-09-03, à partir de `main` @ `0dd69e9`.
 

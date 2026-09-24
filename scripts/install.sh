@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Plume installer.
 #   curl -fsSL https://plume.sprintmob.com/install.sh | sh
+#   curl -fsSL https://plume.sprintmob.com/install.sh | sh -s -- --tag v0.1.0-rc.1
 #
-# Fetches the latest arm64 macOS build from GitHub Releases, installs
-# /Applications/Plume.app and a /usr/local/bin/plume shim into it, and strips
-# the quarantine xattr.
+# Fetches the latest stable arm64 macOS build (or an explicit release tag),
+# installs ~/Applications/Plume.app and ~/.local/bin/plume without admin rights,
+# and strips the quarantine xattr.
 #
 # On Gatekeeper, since half of what people believe about it is wrong: quarantine
 # is applied by the *downloader*, and curl does not apply it. So this path is
@@ -21,15 +22,34 @@ set -euo pipefail
 REPO="sprintmob/plume"
 APP_NAME="Plume"
 EXEC_NAME="plume"
-APP_DIR="/Applications"
-SHIM="/usr/local/bin/${EXEC_NAME}"
+APP_DIR="$HOME/Applications"
+SHIM_DIR="$HOME/.local/bin"
+SHIM="$SHIM_DIR/${EXEC_NAME}"
 ASSET="plume-macos-arm64.zip"
 
 red()    { printf "\033[31m%s\033[0m\n" "$*" >&2; }
 green()  { printf "\033[32m%s\033[0m\n" "$*"; }
 dim()    { printf "\033[2m%s\033[0m\n" "$*"; }
 
-# 1. sanity
+# 1. arguments and sanity
+TAG=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --tag)
+            if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+                red "usage: sh install.sh [--tag v0.1.0-rc.1]"
+                exit 2
+            fi
+            TAG="$2"
+            shift 2
+            ;;
+        *)
+            red "usage: sh install.sh [--tag v0.1.0-rc.1]"
+            exit 2
+            ;;
+    esac
+done
+
 if [ "$(uname -s)" != "Darwin" ]; then
     red "plume is macOS-only (detected $(uname -s))"
     exit 1
@@ -49,17 +69,20 @@ for cmd in curl ditto shasum codesign; do
     fi
 done
 
-# 2. resolve latest release
-dim "→ resolving latest release..."
-TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep -E '"tag_name"' \
-    | head -1 \
-    | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-
-if [ -z "${TAG:-}" ]; then
-    red "couldn't determine latest release tag"
-    exit 1
+# 2. resolve the latest stable release unless a tag was requested explicitly.
+if [ -z "$TAG" ]; then
+    dim "→ resolving latest stable release..."
+    TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+        | sed -nE '/"tag_name"/{s/.*"tag_name": *"([^"]+)".*/\1/;p;q;}')
 fi
+
+case "$TAG" in
+    v[0-9]*) ;;
+    *) red "invalid release tag: $TAG"; exit 1 ;;
+esac
+case "$TAG" in
+    *[!A-Za-z0-9._-]*) red "invalid release tag: $TAG"; exit 1 ;;
+esac
 dim "  ${TAG}"
 
 URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
@@ -106,35 +129,30 @@ if ! codesign --verify --strict "$APP" 2>/dev/null; then
     exit 1
 fi
 
-# 6. install
-SUDO=""
-if [ ! -w "$APP_DIR" ]; then
-    SUDO="sudo"
-fi
+# 6. install only inside the current user's home directory. Refuse path links
+# that could redirect a write into a system location.
+for path in "$APP_DIR" "$HOME/.local" "$SHIM_DIR" "$APP_DIR/${APP_NAME}.app" "$SHIM"; do
+    if [ -L "$path" ]; then
+        red "refusing to install through a symbolic link: $path"
+        exit 1
+    fi
+done
+mkdir -p "$APP_DIR" "$SHIM_DIR"
 
 dim "→ installing to ${APP_DIR}/${APP_NAME}.app..."
-$SUDO rm -rf "${APP_DIR}/${APP_NAME}.app"
-$SUDO ditto "$APP" "${APP_DIR}/${APP_NAME}.app"
-
-SHIM_SUDO=""
-if [ ! -w "$(dirname "$SHIM")" ]; then
-    if [ ! -d "$(dirname "$SHIM")" ]; then
-        dim "→ creating $(dirname "$SHIM") (sudo)..."
-        sudo mkdir -p "$(dirname "$SHIM")"
-    fi
-    SHIM_SUDO="sudo"
-fi
+rm -rf "${APP_DIR}/${APP_NAME}.app"
+ditto "$APP" "${APP_DIR}/${APP_NAME}.app"
 
 # The CLI is the app. A shim and not a symlink: Bundle.main does not resolve
 # through a symlink, so a symlinked plume would read a different preferences
 # domain than the daemon. See docs/adr/0008-ship-a-real-app-bundle.md.
 dim "→ writing ${SHIM}..."
-$SHIM_SUDO tee "$SHIM" >/dev/null <<SHIM_BODY
+cat > "$SHIM" <<SHIM_BODY
 #!/bin/sh
 # ${SHIM}: the CLI is the app.
 exec "${APP_DIR}/${APP_NAME}.app/Contents/MacOS/${EXEC_NAME}" "\$@"
 SHIM_BODY
-$SHIM_SUDO chmod 755 "$SHIM"
+chmod 755 "$SHIM"
 
 green "✓ Plume ${TAG} installed at ${APP_DIR}/${APP_NAME}.app"
 echo
@@ -142,11 +160,13 @@ echo
 if [ -d "$HOME/Library/Application Support/parrot" ] \
    || [ -f "$HOME/Library/LaunchAgents/com.digimata.parrot.plist" ]; then
     echo "found a parrot install. carry it over first, or the models download again:"
-    echo "  plume install --migrate"
+    echo "  ${SHIM} install --migrate"
     echo
 fi
 
 echo "next:"
-echo "  plume setup                       # grant mic + accessibility"
-echo "  plume install --launch-at-login   # (optional) start at login"
-echo "  plume                             # run the daemon"
+echo "  ${SHIM} setup                       # grant mic + accessibility"
+echo "  ${SHIM} install --launch-at-login   # (optional) start at login"
+echo "  ${SHIM}                             # run the daemon"
+echo
+echo "To use 'plume' without its full path, add ${SHIM_DIR} to your PATH yourself."

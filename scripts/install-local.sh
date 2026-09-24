@@ -25,9 +25,8 @@
 # the macOS Security framework cannot read.
 #
 # Since the daemon moved into a .app bundle, this installs three things rather
-# than one: ~/Applications/Plume.app, the /usr/local/bin/plume shim, and a
-# re-bootstrapped launch agent. ~/Applications rather than /Applications so a
-# rebuild needs no sudo.
+# than one: ~/Applications/Plume.app, the ~/.local/bin/plume shim, and a
+# re-bootstrapped launch agent. Both paths are user-writable.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -35,7 +34,7 @@ cd "$(dirname "$0")/.."
 . scripts/lib.sh
 
 APP_DEST="${PLUME_APP_PATH:-$HOME/Applications/$APP_NAME.app}"
-SHIM="${PLUME_SHIM_PATH:-/usr/local/bin/$EXEC_NAME}"
+SHIM="${PLUME_SHIM_PATH:-$HOME/.local/bin/$EXEC_NAME}"
 
 # The rename does not reach into the login keychain, and recreating the
 # certificate is a keychain operation only you can run. So: prefer the new
@@ -84,6 +83,7 @@ mkdir -p "$(dirname "$APP_DEST")"
 rm -rf "$APP_DEST"
 ditto "$APP" "$APP_DEST"
 
+mkdir -p "$(dirname "$SHIM")"
 write_cli_shim "$APP_DEST" "$SHIM"
 
 if [ -f "$HOME/Library/LaunchAgents/$LABEL.plist" ]; then
@@ -101,9 +101,9 @@ echo "requirement: $requirement"
 log=$(/usr/libexec/PlistBuddy -c "Print :StandardErrorPath" \
     "$HOME/Library/LaunchAgents/$LABEL.plist" 2>/dev/null || echo "unknown")
 if [ "$log" = "unknown" ]; then
-  echo "agent:       none registered — run 'plume install --launch-at-login'"
+  echo "agent:       none registered — run '$SHIM install --launch-at-login'"
 elif [ "$log" = "/dev/null" ]; then
-  echo "log:         discarded — reinstall the agent with 'plume install --launch-at-login --log-file' to keep it"
+  echo "log:         discarded — reinstall the agent with '$SHIM install --launch-at-login --log-file' to keep it"
 else
   echo "log:         $log"
 fi

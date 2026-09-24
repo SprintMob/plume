@@ -39,7 +39,7 @@ plume_version() {
 # a matter of taste: measured on 2026-09-06, `Bundle.main` does NOT resolve
 # through a symlink to the .app. The same build reports version "dev" through
 # `ln -s` and "0.0.5" through this shim, which means bundleIdentifier is nil
-# through the link, which means `plume doctor` run from /usr/local/bin would
+# through the link, which means `plume doctor` run from ~/.local/bin would
 # take the process-name preferences domain while the daemon in the bundle takes
 # com.sprintmob.plume. Two domains, and every remembered choice written to the
 # one nothing reads. That is the failure ADR-0004 exists to prevent.

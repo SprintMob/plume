@@ -19,7 +19,7 @@ and has the Accessibility permission. The interesting failures are:
   `--dump-wav` exist and say what they do; those are not the bug.
 - **The event tap.** Anything that turns the tap into a keylogger reachable by
   another process, or that lets injected text land somewhere it was not aimed.
-- **Privilege and paths.** The launch agent, the `/usr/local/bin/plume` shim,
+- **Privilege and paths.** The launch agent, the `~/.local/bin/plume` shim,
   the model store. A writable path that ends up executed is the shape to look
   for.
 - **The installer.** `scripts/install.sh` fetches over HTTPS, verifies a SHA-256

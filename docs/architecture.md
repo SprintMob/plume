@@ -2,7 +2,7 @@
 
 ## Goals
 
-1. **CLI executable.** ~~Single binary, launched from the terminal.~~ The menu bar arrived in wave 3 and the settings window with it; the dock icon appears only while that window is open; and the daemon now ships inside `Plume.app` with `/usr/local/bin/plume` as a shim into it. The bundle is for TCC, not for looks: unbundled, the Accessibility grant attaches to whichever terminal launched the daemon. See [ADR-0004](./adr/0004-settings-in-userdefaults.md), [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md) and [ADR-0008](./adr/0008-ship-a-real-app-bundle.md).
+1. **CLI executable.** ~~Single binary, launched from the terminal.~~ The menu bar arrived in wave 3 and the settings window with it; the dock icon appears only while that window is open; and the daemon now ships inside `~/Applications/Plume.app` with `~/.local/bin/plume` as a shim into it. The bundle is for TCC, not for looks: unbundled, the Accessibility grant attaches to whichever terminal launched the daemon. See [ADR-0004](./adr/0004-settings-in-userdefaults.md), [ADR-0007](./adr/0007-a-settings-window-and-a-session-history.md) and [ADR-0008](./adr/0008-ship-a-real-app-bundle.md).
 2. **Push-to-talk.** Hold Fn, speak, release — transcript appears at the cursor.
 3. **Minimal recording feedback.** A small floating pill at the bottom of the screen while recording, so the user knows the mic is hot. Click-through, borderless, hidden when idle.
 4. **On-device.** No network calls for transcription. Audio never leaves the machine.

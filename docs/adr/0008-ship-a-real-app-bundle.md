@@ -1,7 +1,7 @@
 # Ship a real `.app` bundle
 
 Plume now ships as `Plume.app`, assembled by `scripts/bundle.sh` from
-`packaging/Info.plist.in`, with `/usr/local/bin/plume` reduced to a three-line
+`packaging/Info.plist.in`, with `~/.local/bin/plume` reduced to a three-line
 shim that `exec`s the binary inside it.
 
 The cost is not small. It rewrites installation, signing, the launch agent and
@@ -105,14 +105,14 @@ already fought for and documented.
 
 ## The CLI is a shim, and that was measured
 
-`/usr/local/bin/plume` could have been a symlink. It is not, and the reason is
+`~/.local/bin/plume` could have been a symlink. It is not, and the reason is
 not caution:
 
 ```
 $ ln -s …/Plume.app/Contents/MacOS/plume /tmp/plume-link
 $ /tmp/plume-link --version
 dev
-$ /usr/local/bin/plume --version      # the shim
+$ ~/.local/bin/plume --version      # the shim
 0.0.5
 ```
 
@@ -148,6 +148,10 @@ side.
   rather than let a signature that would not survive the next build reach
   `~/Applications`.
 - **The browser download path is blocked by Gatekeeper**; `curl | sh` is not.
+- **The public installer uses per-user paths**: `~/Applications/Plume.app` and
+  `~/.local/bin/plume`. It needs no administrator rights and does not edit shell
+  startup files. Existing system-wide installs remain discoverable for migration
+  and uninstallation.
 - **The saved window frame resets.** The autosave name went from
   `parrot.settings` to `plume.settings` and no migration key is spent on a
   rectangle.

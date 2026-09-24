@@ -144,19 +144,18 @@ fatal. Une ligne défensive dans l'issue, un item dans la validation appareil.
 
 ## Le CLI : un shim, pas un lien symbolique
 
-L'app va dans `/Applications/Plume.app` en distribution,
-`~/Applications/Plume.app` en dev local (pas de sudo à chaque rebuild). Le CLI
-est `/usr/local/bin/plume` :
+L'app va dans `~/Applications/Plume.app` en distribution et en dev local. Le CLI
+est `~/.local/bin/plume` :
 
 ```sh
 #!/bin/sh
-# /usr/local/bin/plume: the CLI is the app.
-exec "/Applications/Plume.app/Contents/MacOS/plume" "$@"
+# ~/.local/bin/plume: the CLI is the app.
+exec "$HOME/Applications/Plume.app/Contents/MacOS/plume" "$@"
 ```
 
 L'alternative est un `ln -s`, plus simple. **Le risque est précis et sévère :**
 si `Bundle.main` ne résout pas à travers le lien jusqu'au `.app`, alors
-`plume doctor` lancé depuis `/usr/local/bin` prend le domaine de préférences
+`plume doctor` lancé depuis `~/.local/bin` prend le domaine de préférences
 `plume` (nom du process) pendant que le démon dans le bundle prend
 `com.sprintmob.plume`. **Deux domaines.**
 `plume install --hotkey right-option` écrirait là où le démon ne lit jamais, et
@@ -187,12 +186,13 @@ Ordre, du plus spécifique au moins :
 1. **Le bundle courant.** Correct que l'app soit dans `/Applications`,
    `~/Applications` ou un `dist/` de développement, et c'est le seul candidat
    qui soit certainement le code en train d'écrire cet agent.
-2. et 3. Les deux emplacements d'installation, par ordre de préférence.
+2. et 3. Les deux emplacements d'installation : `~/Applications` d'abord,
+   `/Applications` seulement pour retrouver les premières installations.
 4. Développement : `.build/release/plume`, non bundlé. **Avertir** : un agent
    pointant là fait tourner le démon avec le domaine de préférences du nom de
    process, donc tous les choix retenus lui sont invisibles.
 
-**`/usr/local/bin/plume` est délibérément absent de la liste.** Pointer le
+**`~/.local/bin/plume` est délibérément absent de la liste.** Pointer le
 LaunchAgent sur le shim ferait superviser un `/bin/sh` par launchd au lieu du
 démon, et détacherait l'attribution TCC du bundle. Le shim est pour les humains.
 
@@ -359,8 +359,9 @@ n'est `dlopen` à l'exécution (les modèles CoreML sont des données), donc pas
 d'exception de validation de bibliothèque.
 
 **Écrire les deux paliers dans `release.yml` maintenant**, le palier 1
-conditionné à `secrets.MACOS_CERTIFICATE_P12 != ''`, pour que l'activer plus
-tard soit un ajout de secret et pas une réécriture du workflow.
+conditionné à une variable de job calculée à partir de
+`secrets.MACOS_CERTIFICATE_P12` : GitHub n'accepte pas de référence directe à
+`secrets` dans `if:`.
 
 ### Le chemin dev local, `scripts/install-local.sh`, lancé **par l'utilisateur**
 
@@ -383,10 +384,9 @@ meilleure chose du script : elles **prouvent** que l'autorisation d'Accessibilit
 survivra au prochain build. Elles doivent survivre à la réécriture, seul le
 chemin changeant.
 
-**4. `ditto`, pas `cat`, pas `cp -R`.** Le `cat` de la ligne 56 existe parce que
-`/usr/local/bin` appartient à root et que codesign écrit des fichiers temporaires
-à côté de sa cible. On ne `cat` pas un répertoire, et `cp -R` peut perdre des
-attributs étendus et invalider le sceau. `ditto` préserve tout.
+**4. `ditto`, pas `cat`, pas `cp -R`.** Le bundle est un répertoire ; `cat` ne
+convient pas, et `cp -R` peut perdre des attributs étendus et invalider le
+sceau. `ditto` préserve tout.
 
 ## Migration : tout vérifier, puis agir
 
@@ -591,12 +591,12 @@ tests cassé.
 
 ### `scripts/install.sh`
 
-`REPO="sprintmob/plume"`, l'app dans `/Applications`, le shim dans
-`/usr/local/bin/plume`.
+`REPO="sprintmob/plume"`, l'app dans `~/Applications`, le shim dans
+`~/.local/bin/plume`.
 
 Flux : Darwin et arm64 → résoudre le dernier tag → télécharger le zip et son
 `.sha256` → `shasum -c` → **`ditto -x -k`** → **`xattr -dr`** →
-**`codesign --verify --strict`** → `sudo ditto` vers `/Applications` → écrire le
+**`codesign --verify --strict`** → `ditto` vers `~/Applications` → écrire le
 shim → si `~/Library/Application Support/parrot` ou l'ancien plist existe,
 afficher `run: plume install --migrate`.
 

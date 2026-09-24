@@ -89,7 +89,7 @@ struct Install: ParsableCommand {
             }
         } catch InstallError.binaryNotFound {
             FileHandle.standardError.write(Data(
-                "couldn't find Plume.app. install it to /Applications or ~/Applications first.\n".utf8
+                "couldn't find Plume.app. install it to ~/Applications first.\n".utf8
             ))
             throw ExitCode(1)
         }
@@ -100,22 +100,23 @@ struct Install: ParsableCommand {
     /// directory of weights, and leaving someone to find those themselves is
     /// the kind of thing an open source release gets judged on. Printed rather
     /// than done: deleting an app and gigabytes of weights is a decision, and
-    /// two of the three paths need root.
+    /// a system-wide install, if one exists, may need root.
     private func reportWhatIsLeft() {
         let fm = FileManager.default
         var leftovers: [String] = []
 
         for bundle in Install.bundleSearchPaths where fm.fileExists(atPath: bundle) {
             let needsRoot = !fm.isWritableFile(atPath: (bundle as NSString).deletingLastPathComponent)
-            leftovers.append("\(needsRoot ? "sudo " : "")rm -rf \(bundle)")
+            leftovers.append("\(needsRoot ? "sudo " : "")rm -rf \(shellQuote(bundle))")
         }
-        let shim = "/usr/local/bin/plume"
-        if fm.fileExists(atPath: shim) {
-            leftovers.append("sudo rm \(shim)")
+        for shim in [NSHomeDirectory() + "/.local/bin/plume", "/usr/local/bin/plume"]
+            where fm.fileExists(atPath: shim) {
+            let needsRoot = !fm.isWritableFile(atPath: (shim as NSString).deletingLastPathComponent)
+            leftovers.append("\(needsRoot ? "sudo " : "")rm \(shellQuote(shim))")
         }
         let models = ModelWeights.root.path
         if fm.fileExists(atPath: models) {
-            leftovers.append("rm -rf \(models)    # the downloaded models")
+            leftovers.append("rm -rf \(shellQuote(models))    # the downloaded models")
         }
 
         guard !leftovers.isEmpty else { return }
@@ -123,6 +124,10 @@ struct Install: ParsableCommand {
         for line in leftovers {
             print("  \(line)")
         }
+    }
+
+    private func shellQuote(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     /// Preconditions first, action second, and nothing in between. See
@@ -379,11 +384,11 @@ struct Install: ParsableCommand {
         return true
     }
 
-    /// The two places an installed Plume.app lives: system-wide, then the
-    /// per-user one install-local.sh uses so a rebuild needs no sudo.
+    /// Prefer the per-user install used by both installers. Keep the legacy
+    /// system-wide location for upgrades from early builds.
     static let bundleSearchPaths = [
-        "/Applications/Plume.app",
         NSHomeDirectory() + "/Applications/Plume.app",
+        "/Applications/Plume.app",
     ]
 
     /// The invariant this function exists to hold: **`ProgramArguments[0]` must
@@ -395,7 +400,7 @@ struct Install: ParsableCommand {
     /// total, silent failure, and it is the mode ADR-0004 exists to prevent.
     /// `DoctorReport.checkLaunchAgentArgs` enforces it from the other side.
     ///
-    /// `/usr/local/bin/plume` is deliberately absent from the list. It is a
+    /// `~/.local/bin/plume` is deliberately absent from the list. It is a
     /// three-line shim that `exec`s the real binary: pointing launchd at it
     /// would have launchd supervise a `/bin/sh`, and would detach the TCC
     /// attribution from the bundle. The shim is for humans.
