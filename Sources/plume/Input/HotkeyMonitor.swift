@@ -7,7 +7,7 @@ import Foundation
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
 final class HotkeyMonitor {
-    enum Event { case pressed, released, interrupted }
+    enum Event: Equatable { case pressed, released, interrupted }
     enum HotkeyError: Error { case tapCreateFailed }
 
     /// A modifier key usable as push-to-talk.
@@ -66,7 +66,8 @@ final class HotkeyMonitor {
     private var onEvent: ((Event) -> Void)?
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var isPressed = false
+    private var edges = HotkeyEdgeState()
+    private var tapContext: HotkeyTapContext?
 
     init(mask: CGEventFlags = .maskSecondaryFn, keycode: Int64? = nil, debug: Bool = false) {
         self.mask = mask
@@ -88,15 +89,16 @@ final class HotkeyMonitor {
         // A key held under the old modifier can never send a release we would
         // recognise, so the reset `reEnable()` does applies here too: without
         // it a recording started before the switch never ends.
-        if isPressed {
-            isPressed = false
-            onEvent?(.interrupted)
+        if edges.isPressed, let session = edges.session,
+           let interruption = edges.interrupt(session: session) {
+            onEvent?(interruption)
         }
     }
 
     func start(onEvent: @escaping (Event) -> Void) throws {
-        self.onEvent = onEvent
-
+        // Every start owns a fresh edge session, even when a physical release
+        // was lost while the previous tap was stopped.
+        stop()
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
         if !trusted {
@@ -117,7 +119,10 @@ final class HotkeyMonitor {
                 (1 << CGEventType.keyDown.rawValue)
                 | (1 << CGEventType.keyUp.rawValue)
         }
-        let userInfo = Unmanaged.passUnretained(self).toOpaque()
+        self.onEvent = onEvent
+        let context = HotkeyTapContext(monitor: self, session: edges.beginSession())
+        tapContext = context
+        let userInfo = Unmanaged.passUnretained(context).toOpaque()
 
         // .cgSessionEventTap is the right level for an accessibility-granted
         // user process (.cghidEventTap requires root).
@@ -131,6 +136,7 @@ final class HotkeyMonitor {
                 userInfo: userInfo
             )
         else {
+            stop()
             throw HotkeyError.tapCreateFailed
         }
 
@@ -143,35 +149,42 @@ final class HotkeyMonitor {
     }
 
     func stop() {
+        // Invalidate delivery first: already queued callbacks keep their old
+        // session and cannot alter a stopped or newly restarted monitor.
+        edges.endSession()
+        onEvent = nil
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
         }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
         tap = nil
         runLoopSource = nil
-        onEvent = nil
+        tapContext = nil
     }
 
     /// Called from the tap callback when macOS disables our tap. Without this
     /// the process keeps running, the menu bar icon stays put, and the hotkey
     /// silently does nothing until the user restarts plume.
-    fileprivate func reEnable() {
-        guard let tap else { return }
+    fileprivate func reEnable(session: UUID) {
+        guard edges.isCurrent(session), let tap else { return }
         CGEvent.tapEnable(tap: tap, enable: true)
         // The disable swallowed whatever edges happened while it was down, so
         // the release that ends an in-flight recording may never arrive. Reset
         // the edge state and tell the caller, rather than staying stuck
         // believing the key is still held.
-        isPressed = false
-        onEvent?(.interrupted)
+        if let interruption = edges.interrupt(session: session) {
+            onEvent?(interruption)
+        }
         FileHandle.standardError.write(Data(
             "event tap was disabled by the system, re-enabled\n".utf8
         ))
     }
 
-    fileprivate func handle(type: CGEventType, event: CGEvent) {
+    fileprivate func handle(type: CGEventType, event: CGEvent, session: UUID) {
+        guard edges.isCurrent(session) else { return }
         if debug {
             let flags = event.flags
             let keycode = event.getIntegerValueField(.keyboardEventKeycode)
@@ -186,9 +199,54 @@ final class HotkeyMonitor {
         // physical key before reading the flag.
         if let keycode, event.getIntegerValueField(.keyboardEventKeycode) != keycode { return }
         let pressed = event.flags.contains(mask)
-        guard pressed != isPressed else { return }
+        if let edge = edges.receive(pressed: pressed, session: session) {
+            onEvent?(edge)
+        }
+    }
+}
+
+/// The production input edge seam. Synthetic tests use the same session and
+/// transition rules without creating an event tap or requesting permissions.
+struct HotkeyEdgeState {
+    private(set) var session: UUID?
+    private(set) var isPressed = false
+
+    mutating func beginSession() -> UUID {
+        let next = UUID()
+        session = next
+        isPressed = false
+        return next
+    }
+
+    mutating func endSession() {
+        session = nil
+        isPressed = false
+    }
+
+    func isCurrent(_ candidate: UUID) -> Bool { session == candidate }
+
+    mutating func receive(pressed: Bool, session: UUID) -> HotkeyMonitor.Event? {
+        guard isCurrent(session), pressed != isPressed else { return nil }
         isPressed = pressed
-        onEvent?(pressed ? .pressed : .released)
+        return pressed ? .pressed : .released
+    }
+
+    mutating func interrupt(session: UUID) -> HotkeyMonitor.Event? {
+        guard isCurrent(session) else { return nil }
+        isPressed = false
+        return .interrupted
+    }
+}
+
+/// Each native tap keeps its own immutable token. Queued closures retain this
+/// context after stop invalidates the port, so an old callback can never borrow
+/// the token of a replacement tap.
+private final class HotkeyTapContext {
+    weak var monitor: HotkeyMonitor?
+    let session: UUID
+    init(monitor: HotkeyMonitor, session: UUID) {
+        self.monitor = monitor
+        self.session = session
     }
 }
 
@@ -199,18 +257,19 @@ private func hotkeyCallback(
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     guard let userInfo else { return Unmanaged.passUnretained(event) }
-    let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+    let context = Unmanaged<HotkeyTapContext>.fromOpaque(userInfo).takeUnretainedValue()
+    guard let monitor = context.monitor else { return Unmanaged.passUnretained(event) }
 
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
         // The tap must be re-enabled from the run loop that owns it.
-        DispatchQueue.main.async { monitor.reEnable() }
+        DispatchQueue.main.async { [weak monitor] in monitor?.reEnable(session: context.session) }
         return Unmanaged.passUnretained(event)
     }
 
     let copy = event.copy()
-    DispatchQueue.main.async {
+    DispatchQueue.main.async { [weak monitor] in
         if let copy {
-            monitor.handle(type: type, event: copy)
+            monitor?.handle(type: type, event: copy, session: context.session)
         }
     }
     return Unmanaged.passUnretained(event)

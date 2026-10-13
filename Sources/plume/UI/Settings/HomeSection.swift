@@ -58,7 +58,7 @@ struct HomeSection: View {
     }
 
     private var statusText: String {
-        guard state.canCapture else { return state.preparation.description }
+        if let blocker = state.captureBlockerDescription { return blocker }
         switch state.dictation {
         case .idle: return "Idle"
         case .recording: return "Recording"

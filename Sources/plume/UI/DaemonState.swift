@@ -28,6 +28,23 @@ final class DaemonState: ObservableObject {
         preparation == .ready && readiness.permitsPreparation(hotkey: hotkey)
             && pendingModel == nil
     }
+    /// A loaded model can still be blocked. Both status surfaces use this
+    /// reason instead of presenting model preparation as capture readiness.
+    var captureBlockerDescription: String? {
+        if !readiness.installedLocation { return "Move Plume to Applications" }
+        if readiness.conflictingBundle { return "Another Plume is running" }
+        if !readiness.microphone { return "Microphone access required" }
+        if !readiness.accessibility { return "Accessibility access required" }
+        if hotkey == .fn && !readiness.fnConfigured { return "Configure the Fn key" }
+        if let pending = pendingModel {
+            if let fraction = switchProgress, fraction < 1 {
+                return "Downloading \(pending.displayName) · \(Int(fraction * 100))%"
+            }
+            return "Loading \(pending.displayName)…"
+        }
+        return preparation == .ready ? nil : preparation.description
+    }
+
     var onReadinessChanged: (() -> Void)?
     func updateReadiness(_ facts: StartupReadiness) {
         readiness = facts

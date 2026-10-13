@@ -130,7 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private var stateTitle: String {
-        guard state.canCapture else { return state.preparation.description }
+        if let blocker = state.captureBlockerDescription { return blocker }
         switch state.dictation {
         case .idle:
             return "idle · hold \(state.hotkey.rawValue) or double-tap to lock"

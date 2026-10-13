@@ -47,6 +47,38 @@ final class StartupTests: XCTestCase {
         XCTAssertFalse(state.canCapture)
     }
 
+    func testLoadedModelStatusDescribesPermissionAndKeyBlockers() {
+        let state = state()
+        state.setPreparation(.ready)
+        state.updateReadiness(granted)
+        XCTAssertNil(state.captureBlockerDescription)
+        var facts = granted; facts.microphone = false
+        state.updateReadiness(facts)
+        XCTAssertEqual(state.captureBlockerDescription, "Microphone access required")
+        facts = granted; facts.accessibility = false
+        state.updateReadiness(facts)
+        XCTAssertEqual(state.captureBlockerDescription, "Accessibility access required")
+        facts = granted; facts.fnConfigured = false
+        state.updateReadiness(facts)
+        XCTAssertEqual(state.captureBlockerDescription, "Configure the Fn key")
+        XCTAssertEqual(state.preparation, .ready)
+    }
+
+    func testLoadedModelStatusDescribesPendingDownloadAndLoading() {
+        let state = state(); state.setPreparation(.ready); state.updateReadiness(granted)
+        let next = ModelRegistry.shared.first { $0.id != state.model.id }!
+        state.selectModel(next)
+        XCTAssertFalse(state.canCapture)
+        XCTAssertEqual(state.captureBlockerDescription, "Loading \(next.displayName)…")
+        state.switchProgressed(0.5)
+        XCTAssertEqual(state.captureBlockerDescription, "Downloading \(next.displayName) · 50%")
+        state.switchProgressed(1)
+        XCTAssertEqual(state.captureBlockerDescription, "Loading \(next.displayName)…")
+        state.switched(to: next)
+        XCTAssertTrue(state.canCapture)
+        XCTAssertNil(state.captureBlockerDescription)
+    }
+
     func testFnMustBeConfiguredOrAlternateKeySelected() {
         let state = state()
         var facts = granted; facts.fnConfigured = false
