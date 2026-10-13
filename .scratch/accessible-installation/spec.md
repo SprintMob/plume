@@ -1,6 +1,6 @@
 # Installer Plume sans Terminal
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Objectif et choix approuvés
 
