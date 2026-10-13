@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 
 enum InstallError: Error {
+    case transientBundle
     /// No Plume.app anywhere and no usable executable to fall back on. The
     /// agent would name a binary that is not there.
     case binaryNotFound
@@ -230,10 +231,14 @@ struct Install: ParsableCommand {
         FileManager.default.fileExists(atPath: plistURL.path)
     }
 
+    static func writeAgent(logFile: Bool) throws -> Agent {
+        try writeAgent(logFile: logFile, restartLoaded: true)
+    }
+
     /// Writes the agent and bootstraps it. Prints nothing: both the command and
     /// the settings window call this, and only one of them has a terminal.
     @discardableResult
-    static func writeAgent(logFile: Bool) throws -> Agent {
+    static func writeAgent(logFile: Bool, restartLoaded: Bool) throws -> Agent {
         let binary = try resolveBinaryPath()
 
         let logPath: String
@@ -247,6 +252,28 @@ struct Install: ParsableCommand {
         // daemon must never be configured to write transcript text to a log.
         // It also omits --hotkey and --inject-mode, which are remembered
         // instead, so the menu bar can change them and have it stick.
+        let plist = agentPropertyList(binary: binary, logPath: logPath, logFile: logFile)
+
+        let url = Self.plistURL
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: url, options: .atomic)
+
+        // GUI registration must not boot out its own foreground owner.
+        if restartLoaded { _ = runLaunchctl(["bootout", "gui/\(uid())", url.path]) }
+        let result = runLaunchctl(["bootstrap", "gui/\(uid())", url.path])
+        if result.status != 0 {
+            FileHandle.standardError.write(Data(
+                "warning: launchctl bootstrap exited \(result.status):\n\(result.stderr)\n".utf8
+            ))
+        }
+        return Agent(plistPath: url.path, binary: binary, logPath: logPath)
+    }
+
+    static func agentPropertyList(binary: String, logPath: String, logFile: Bool) -> [String: Any] {
         var plist: [String: Any] = [
             "Label": Self.label,
             "ProgramArguments": [binary, "run", "--skip-doctor"],
@@ -262,28 +289,7 @@ struct Install: ParsableCommand {
             plist["Umask"] = Self.logUmask
         }
 
-        let url = Self.plistURL
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let data = try PropertyListSerialization.data(
-            fromPropertyList: plist,
-            format: .xml,
-            options: 0
-        )
-        try data.write(to: url, options: .atomic)
-
-        // Best-effort bootstrap; ignore failure if already loaded.
-        _ = runLaunchctl(["bootout", "gui/\(uid())", url.path])
-        let result = runLaunchctl(["bootstrap", "gui/\(uid())", url.path])
-        if result.status != 0 {
-            FileHandle.standardError.write(Data(
-                "warning: launchctl bootstrap exited \(result.status):\n\(result.stderr)\n".utf8
-            ))
-        }
-
-        return Agent(plistPath: url.path, binary: binary, logPath: logPath)
+        return plist
     }
 
     /// launchd appends to an existing std-path file and leaves its mode alone,
@@ -413,6 +419,11 @@ struct Install: ParsableCommand {
         if Bundle.main.bundleURL.pathExtension == "app",
            let executable = Bundle.main.executableURL,
            fm.isExecutableFile(atPath: executable.path) {
+            let url = Bundle.main.bundleURL
+            let readOnly = (try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
+            guard !InstallationLocation.isTransient(url, readOnly: readOnly) else {
+                throw InstallError.transientBundle
+            }
             return executable.path
         }
 

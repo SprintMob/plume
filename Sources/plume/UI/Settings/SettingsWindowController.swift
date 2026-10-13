@@ -90,10 +90,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = window
     }
 
-    /// There is no `.app` bundle, so there is no MainMenu.nib and `.regular`
+    /// SwiftPM provides no MainMenu.nib, so `.regular`
     /// would otherwise show an empty menu bar. Built once, kept for the life of
     /// the process.
-    private func installMainMenuIfNeeded() {
+    func installMainMenuIfNeeded() {
         guard NSApp.mainMenu == nil else { return }
 
         let main = NSMenu()

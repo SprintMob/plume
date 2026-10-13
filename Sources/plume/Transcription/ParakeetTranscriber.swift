@@ -26,6 +26,7 @@ actor ParakeetTranscriber: Transcriber {
         let weights = try await AsrModels.downloadAndLoad(
             to: directory, version: .v3,
             progressHandler: { progress in onProgress?(progress.fractionCompleted) })
+        onProgress?(1)
         let manager = AsrManager(config: .default)
         try await manager.loadModels(weights)
         self.manager = manager

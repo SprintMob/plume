@@ -14,7 +14,7 @@ struct ModelsSection: View {
 
     private var rows: [ModelCatalog.Row] {
         ModelCatalog.rows(
-            active: state.model,
+            active: state.preparation == .ready ? state.model : nil,
             pending: state.pendingModel,
             progress: state.switchProgress,
             failed: state.failedModel,
@@ -31,6 +31,7 @@ struct ModelsSection: View {
                 ForEach(rows) { row in
                     SettingsDivider()
                     ModelRow(row: row) { state.selectModel(row.model) }
+                        .disabled(state.preparation != .ready || state.dictation != .idle)
                 }
             }
 

@@ -42,7 +42,7 @@ enum ModelCatalog {
     /// no caller before the settings window.
     static func rows(
         models: [TranscriptionModel] = ModelRegistry.shared,
-        active: TranscriptionModel,
+        active: TranscriptionModel?,
         pending: TranscriptionModel? = nil,
         progress: Double? = nil,
         failed: TranscriptionModel? = nil,
@@ -61,7 +61,7 @@ enum ModelCatalog {
 
     private static func status(
         of model: TranscriptionModel,
-        active: TranscriptionModel,
+        active: TranscriptionModel?,
         pending: TranscriptionModel?,
         progress: Double?,
         failed: TranscriptionModel?,
@@ -75,7 +75,7 @@ enum ModelCatalog {
             return .downloading(progress)
         }
         if model.id == failed?.id { return .failed }
-        if model.id == active.id { return .active }
+        if model.id == active?.id { return .active }
         return isInstalled(model) ? .installed : .available
     }
 

@@ -58,6 +58,7 @@ struct HomeSection: View {
     }
 
     private var statusText: String {
+        guard state.canCapture else { return state.preparation.description }
         switch state.dictation {
         case .idle: return "Idle"
         case .recording: return "Recording"
@@ -73,7 +74,7 @@ struct HomeSection: View {
             }
             return "\(Int(fraction * 100))% of \(pending.displayName)"
         }
-        return state.model.displayName
+        return state.model.displayName + (state.preparation == .ready ? "" : " · not loaded")
     }
 
     // MARK: - Setup

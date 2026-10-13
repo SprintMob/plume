@@ -151,8 +151,8 @@ enum DoctorReport {
         case .notDetermined:
             return Check(
                 name: "microphone",
-                status: .warn("not yet requested, will prompt on first recording"),
-                remediation: "run plume and hold \(hotkey.glyph) once; macOS will prompt"
+                status: .warn("not yet requested"),
+                remediation: "open Plume and choose Allow Microphone in setup, or run `plume setup`"
             )
         case .denied, .restricted:
             return Check(

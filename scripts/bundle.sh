@@ -16,6 +16,9 @@
 # tag, and is 0.0.0 outside a tagged checkout.
 
 set -euo pipefail
+# Distribution content must be readable after a drag into shared Applications.
+# Runtime model/log privacy stays with the daemon and launch agent.
+umask 022
 cd "$(dirname "$0")/.."
 # shellcheck source=lib.sh
 . scripts/lib.sh
@@ -28,6 +31,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --output) OUTPUT="$2"; shift 2 ;;
     --arch)   BUILD_ARGS+=(--arch "$2"); shift 2 ;;
+    --scratch-path) BUILD_ARGS+=(--scratch-path "$2"); shift 2 ;;
     --sign)   SIGN_IDENTITY="$2"; shift 2 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 64 ;;
@@ -88,7 +92,12 @@ done
 # damaged rather than as unsigned.
 strip -x "$APP/Contents/MacOS/$EXEC_NAME"
 
-codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$APP"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  codesign --force --sign - --timestamp=none "$APP"
+else
+  codesign --force --options runtime --timestamp \
+    --entitlements packaging/plume.entitlements --sign "$SIGN_IDENTITY" "$APP"
+fi
 codesign --verify --strict --verbose=2 "$APP"
 
 echo "built:   $APP"

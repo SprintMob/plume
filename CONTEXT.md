@@ -86,7 +86,8 @@ _Avoid_: cache, download base, huggingface folder
 
 **Warmup**:
 Loading the active model into memory when the daemon starts, before any dictation.
-A failed warmup is what makes the daemon exit.
+Bundled startup shows a retryable failure without exiting; preparation state
+distinguishes selected metadata from a model ready for dictation.
 
 **Dataless model**:
 A model iCloud has evicted: directory and file names survive, the blocks don't.
@@ -154,7 +155,8 @@ _Avoid_: symlink, alias, wrapper
 
 **Launch agent**:
 The per-user `com.sprintmob.plume` job that keeps the daemon running at login. Its
-`KeepAlive` policy is what turns a warmup failure into a relaunch loop. Its
+`KeepAlive` policy used to turn a warmup failure into a relaunch loop; guided
+startup keeps those failures visible in the running process. Its
 `ProgramArguments[0]` must be inside the **app bundle**: outside one the daemon
 reads the process-name preferences domain and every **remembered choice** is
 invisible to it. Before the rename the label was `com.digimata.parrot`, which

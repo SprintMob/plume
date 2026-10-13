@@ -1,4 +1,6 @@
 import AppKit
+import AVFoundation
+import ApplicationServices
 import ArgumentParser
 import Foundation
 import WhisperKit
@@ -107,7 +109,16 @@ struct Run: ParsableCommand {
         let hotkey = settings.resolvedHotkey(flag: self.hotkey)
         let injectMode = settings.resolvedInjectMode(flag: self.injectMode)
 
-        if !skipDoctor {
+        let bundled = Bundle.main.bundleURL.pathExtension == "app"
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let singleton = DaemonSingleton()
+        if bundled, try !singleton.acquire() {
+            DaemonSingleton.requestReopen()
+            return
+        }
+
+        if !bundled && !skipDoctor {
             let checks = DoctorReport.run(hotkey: hotkey)
             if !DoctorReport.allOK(checks) {
                 FileHandle.standardError.write(Data("startup checks failed:\n".utf8))
@@ -131,30 +142,6 @@ struct Run: ParsableCommand {
         }
 
         let transcriber = ActiveTranscriber(model: chosenModel)
-        let warmupSemaphore = DispatchSemaphore(value: 0)
-        var warmupError: Error?
-        Task.detached {
-            do {
-                try await transcriber.warmUp()
-            } catch {
-                warmupError = error
-            }
-            warmupSemaphore.signal()
-        }
-        warmupSemaphore.wait()
-        if let warmupError {
-            FileHandle.standardError.write(Data("warmup failed: \(warmupError)\n".utf8))
-            throw ExitCode(1)
-        }
-
-        // Whatever an earlier run left behind is dead weight now that this model
-        // is loaded — except the one switched away from, which the user is one
-        // menu click from wanting again.
-        reclaim(ModelWeights.purge(keeping: [chosenModel, models.previous].compactMap { $0 }))
-
-        let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
-
         let monitor = HotkeyMonitor(hotkey: hotkey, debug: debugHotkey)
         let devices = InputDeviceStore()
         let capture = AudioCapture()
@@ -214,6 +201,11 @@ struct Run: ParsableCommand {
         }
 
         func beginRecording() -> Bool {
+            // Recheck at the capture boundary too: a revoked permission must
+            // never leak through a previously ready UI snapshot.
+            guard MainActor.assumeIsolated({ state.canCapture }),
+                  AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+                  AXIsProcessTrusted() else { return false }
             // Chromium and Electron apps only build their accessibility tree
             // once an assistive technology asks. Ask at the start of the
             // dictation, so the tree is ready by the time — a second or more
@@ -363,27 +355,53 @@ struct Run: ParsableCommand {
             )
         }
 
-        do {
-            try monitor.start { event in
-                MainActor.assumeIsolated {
-                    gestureController.handle(event)
-                }
-            }
-        } catch {
-            FileHandle.standardError.write(Data("failed to register hotkey tap: \(error)\n".utf8))
-            FileHandle.standardError.write(Data("run `plume setup` to configure permissions.\n".utf8))
-            // Exit 0: a missing permission is not transient, and the LaunchAgent's
-            // KeepAlive would otherwise restart us into an endless prompt loop.
-            throw ExitCode(0)
-        }
-
         let cleanUp = {
             MainActor.assumeIsolated {
                 gestureController.cancel()
+                overlay.hide()
+                if state.dictation == .recording || state.dictation == .locked {
+                    state.setDictation(.idle)
+                }
             }
             _ = capture.stop()
             outputMute.restore()
         }
+        let startup = MainActor.assumeIsolated {
+            let controller = StartupController(
+                state: state,
+                services: .live(transcriber: transcriber, bundled: bundled),
+                showSettings: { settingsWindow.show() })
+            settingsWindow.installMainMenuIfNeeded()
+            app.delegate = controller
+            menuBar.onOpenSettings = { controller.reopen() }
+            state.onHotkey = {
+                monitor.setHotkey($0)
+                controller.refresh()
+            }
+            var tapStarted = false
+            state.onReadinessChanged = {
+                if state.canCapture && !tapStarted {
+                    do {
+                        try monitor.start { event in
+                            MainActor.assumeIsolated {
+                                if state.canCapture { gestureController.handle(event) }
+                            }
+                        }
+                        tapStarted = true
+                    } catch {
+                        state.setPreparation(.failed("Could not register the hold-to-talk key. Check Accessibility, then Retry."))
+                        controller.show()
+                    }
+                } else if !state.canCapture && tapStarted {
+                    monitor.stop()
+                    tapStarted = false
+                    cleanUp()
+                }
+            }
+            controller.start()
+            return controller
+        }
+
         let terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: app,
@@ -410,8 +428,11 @@ struct Run: ParsableCommand {
         signal(SIGTERM, SIG_IGN)
 
         FileHandle.standardError.write(
-            Data("listening on \(hotkey.rawValue) hold · model: \(chosenModel.id) · ^C to quit\n".utf8))
-        app.run()
+            Data("preparing \(chosenModel.id) · key: \(hotkey.rawValue) · ^C to quit\n".utf8))
+        // Keep the lock, controllers and model alive for the entire AppKit loop.
+        withExtendedLifetime((singleton, startup, menuBar, settingsWindow, transcriber)) {
+            app.run()
+        }
         NotificationCenter.default.removeObserver(terminationObserver)
     }
 }

@@ -34,6 +34,7 @@ actor WhisperKitTranscriber: Transcriber {
         // `downloadBase` is not redundant beside an explicit `modelFolder`: the
         // tokenizer is fetched separately and lands under the base. Drop it and
         // tokenizers go back to `Documents`, which is the eviction this avoids.
+        onProgress?(1)
         let config = WhisperKitConfig(
             model: engineID,
             downloadBase: ModelWeights.whisperKitBase,

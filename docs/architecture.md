@@ -65,7 +65,7 @@ $ plume
 
 ### `main.swift` (PlumeCLI)
 
-Argument parsing (via `swift-argument-parser`), config loading, module wiring. Calls `NSApplication.shared.setActivationPolicy(.accessory)` so the process has no dock icon and no menu bar entry, then runs `NSApp.run()` to keep the process alive and drive the AppKit run loop (needed for `NSWindow`, `CGEventTap`, and AVFoundation). Exits cleanly on SIGINT. Logs status to stderr so a user running it in a terminal can see what's happening.
+Argument parsing (via `swift-argument-parser`), config loading, module wiring. Calls `NSApplication.shared.setActivationPolicy(.accessory)` so the process has no dock icon and no menu bar entry, then runs `NSApp.run()` to keep the process alive and drive the AppKit run loop (needed for `NSWindow`, `CGEventTap`, and AVFoundation). Exits cleanly on SIGINT. Logs status to stderr so a user running it in a terminal can see what's happening. Bundled launches create their menu bar and a separate onboarding/recovery window before required startup checks or asynchronous model preparation. Readiness gates the event tap and capture; download failures stay visible with Retry (ADR-0009).
 
 Subcommands:
 - `plume` (default) — run the daemon
@@ -309,7 +309,7 @@ plume/
   README.md
 ```
 
-Build: `swift build -c release`. Resulting binary at `.build/release/plume`. Install: copy to `~/.local/bin/` or `/usr/local/bin/`.
+Build: `swift build -c release`. Resulting binary at `.build/release/plume`. Bundle: `scripts/bundle.sh`. Install the resulting `Plume.app` in Applications (or `~/Applications`); the CLI installer also writes the shim in `~/.local/bin/`.
 
 ### On Swift "modules"
 
@@ -319,5 +319,5 @@ Swift's module unit is the **SPM target** (one target = one module = one `import
 
 - **Parakeet via FluidAudio vs. direct CoreML?** FluidAudio is faster to integrate but adds a dependency. Decide once we benchmark both.
 - **Hotkey conflicts.** Right-Option is unused on most keyboards but some users remap it. Print a clear error if `CGEventTap` registration fails.
-- **First-run UX.** Bundle `whisper-base.en` so `plume` works out of the box, or always require an explicit download? Probably the latter — keeps the binary small and the model directory clean.
-- **Code signing.** A self-built unsigned binary works fine locally but accessibility permission persistence is more reliable for signed binaries. Decide if we sign for personal distribution.
+- **First-run UX (resolved).** The separate onboarding window prepares the recommended Parakeet TDT v3 model (about 461 MB), or a remembered/explicit model, asynchronously after required permission and key configuration. Readiness gates the event tap; failure has Retry. See ADR-0009.
+- **Code signing (resolved).** Local bundles may be ad hoc; public tag releases require Developer ID signing and notarization. The site download stays gated until a stable signed DMG is published. See ADR-0009.

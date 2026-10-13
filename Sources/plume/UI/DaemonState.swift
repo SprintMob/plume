@@ -22,6 +22,22 @@ final class DaemonState: ObservableObject {
 
     @Published private(set) var dictation: Dictation = .idle
 
+    @Published private(set) var preparation: Preparation = .waiting
+    @Published private(set) var readiness = StartupReadiness()
+    var canCapture: Bool {
+        preparation == .ready && readiness.permitsPreparation(hotkey: hotkey)
+            && pendingModel == nil
+    }
+    var onReadinessChanged: (() -> Void)?
+    func updateReadiness(_ facts: StartupReadiness) {
+        readiness = facts
+        onReadinessChanged?()
+    }
+    func setPreparation(_ next: Preparation) {
+        preparation = next
+        onReadinessChanged?()
+    }
+
     // MARK: - The model
 
     @Published private(set) var model: TranscriptionModel
@@ -114,7 +130,7 @@ final class DaemonState: ObservableObject {
     /// Entry point for both surfaces. Records the choice, then hands it to the
     /// daemon, which loads the new model before dropping the one in use.
     func selectModel(_ next: TranscriptionModel) {
-        guard next.id != model.id, pendingModel == nil else { return }
+        guard preparation == .ready, dictation == .idle, next.id != model.id, pendingModel == nil else { return }
         pendingModel = next
         switchProgress = nil
         failedModel = nil
@@ -131,11 +147,13 @@ final class DaemonState: ObservableObject {
         pendingModel = nil
         switchProgress = nil
         failedModel = nil
+        onReadinessChanged?()
     }
 
     func switchFailed(_ attempted: TranscriptionModel) {
         pendingModel = nil
         switchProgress = nil
         failedModel = attempted
+        onReadinessChanged?()
     }
 }
