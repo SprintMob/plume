@@ -1,16 +1,46 @@
 #!/bin/bash
 # Public releases require Developer ID signing and Apple notarization.
-# Credentials are GitHub Actions secrets, never command-line arguments or files in git.
+# Release credentials are supplied through encrypted GitHub Actions secrets.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD MACOS_SIGN_IDENTITY \
-  MACOS_NOTARY_PROFILE MACOS_NOTARY_APPLE_ID MACOS_NOTARY_TEAM_ID MACOS_NOTARY_APP_PASSWORD; do
-  [ -n "${!name:-}" ] || { echo "required release secret is absent: $name" >&2; exit 1; }
-done
-case "$MACOS_SIGN_IDENTITY" in
-  "Developer ID Application:"*) ;;
-  *) echo "public releases require a Developer ID Application identity" >&2; exit 1 ;;
+# This exact preflight is shared by the workflow and the actual signing path.
+# GitHub exposes absent secrets as empty environment values; any nonempty API
+# credential selects API auth and requires the whole team-key trio.
+preflight() {
+  for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD MACOS_SIGN_IDENTITY; do
+    [ -n "${!name:-}" ] || { echo "required release secret is absent: $name" >&2; return 1; }
+  done
+  case "$MACOS_SIGN_IDENTITY" in
+    "Developer ID Application:"*) ;;
+    *) echo "public releases require a Developer ID Application identity" >&2; return 1 ;;
+  esac
+  if [ -n "${MACOS_NOTARY_KEY_ID:-}${MACOS_NOTARY_ISSUER_ID:-}${MACOS_NOTARY_KEY_P8:-}" ]; then
+    NOTARY_AUTH="api"
+    for name in MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID MACOS_NOTARY_KEY_P8; do
+      [ -n "${!name:-}" ] || { echo "required release secret is absent: $name" >&2; return 1; }
+    done
+  else
+    NOTARY_AUTH="apple-id"
+    for name in MACOS_NOTARY_APPLE_ID MACOS_NOTARY_TEAM_ID MACOS_NOTARY_APP_PASSWORD; do
+      [ -n "${!name:-}" ] || { echo "required release secret is absent: $name" >&2; return 1; }
+    done
+  fi
+  MACOS_NOTARY_PROFILE="${MACOS_NOTARY_PROFILE:-plume-notary}"
+}
+
+PREFLIGHT_ONLY=false
+case "$#" in
+  0) ;;
+  1) if [ "$1" = "--preflight" ]; then PREFLIGHT_ONLY=true
+     else echo "usage: release-signed.sh [--preflight]" >&2; exit 64; fi ;;
+  *) echo "usage: release-signed.sh [--preflight]" >&2; exit 64 ;;
 esac
+preflight
+if [ "$PREFLIGHT_ONLY" = true ]; then
+  echo "release credential preflight passed (notary authentication: $NOTARY_AUTH)"
+  exit 0
+fi
+
 WORK=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/plume-signing.XXXXXX")
 KEYCHAIN="$WORK/signing.keychain-db"
 KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
@@ -32,9 +62,18 @@ security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD"
 rm -f "$WORK/certificate.p12"
 # Explicitly store the profile in the temporary keychain: its secret name alone
 # is not a profile provisioned on an ephemeral runner.
-xcrun notarytool store-credentials "$MACOS_NOTARY_PROFILE" --keychain "$KEYCHAIN" \
-  --apple-id "$MACOS_NOTARY_APPLE_ID" --team-id "$MACOS_NOTARY_TEAM_ID" \
-  --password "$MACOS_NOTARY_APP_PASSWORD" >/dev/null
+if [ "$NOTARY_AUTH" = "api" ]; then
+  # Retain this private key until both submissions finish; EXIT cleanup removes it.
+  printf '%s' "$MACOS_NOTARY_KEY_P8" > "$WORK/notary-key.p8"
+  chmod 600 "$WORK/notary-key.p8"
+  xcrun notarytool store-credentials "$MACOS_NOTARY_PROFILE" --keychain "$KEYCHAIN" \
+    --key "$WORK/notary-key.p8" --key-id "$MACOS_NOTARY_KEY_ID" \
+    --issuer "$MACOS_NOTARY_ISSUER_ID" >/dev/null
+else
+  xcrun notarytool store-credentials "$MACOS_NOTARY_PROFILE" --keychain "$KEYCHAIN" \
+    --apple-id "$MACOS_NOTARY_APPLE_ID" --team-id "$MACOS_NOTARY_TEAM_ID" \
+    --password "$MACOS_NOTARY_APP_PASSWORD" >/dev/null
+fi
 
 # Build ad hoc, then seal once with the explicitly selected temporary keychain.
 ./scripts/bundle.sh --output dist --arch arm64

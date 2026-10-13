@@ -43,33 +43,70 @@ the functioning CLI action. A prerelease is insufficient to enable the switch.
 ## Secure release provisioning
 
 A maintainer must enroll the publishing organization in the Apple Developer
-Program, obtain a **Developer ID Application** certificate and its private key,
-and accept Apple's current agreements. This manual prerequisite cannot be
-completed by changing the workflow. Do not commit credentials or send them in
+Program, issue a **Developer ID Application** certificate with its private key,
+and accept Apple's current agreements. This one-time certificate issuance is an
+Apple prerequisite. Apple's public API cannot create a Developer ID certificate
+or retrieve a missing private key. Do not commit credentials or send them in
 issues, chat, logs or pull requests.
 
-In the repository's GitHub Actions secrets settings, an authorized maintainer
-must provide these secrets using GitHub's encrypted secret UI:
+An authorized controller or release tool can reuse existing App Store Connect
+API authentication for notarization and populate GitHub's encrypted Actions
+secrets automatically after that certificate issuance. You do not need to enter
+an Apple ID and app-specific password when using this preferred API-key path.
+The tool must upload secrets through authenticated encrypted secret APIs and keep
+private material out of its output, repository and logs. This release script
+consumes the configured secrets; it does not issue certificates, retrieve keys,
+or access a developer's local ASC profile automatically.
+
+Both authentication paths require these signing secrets:
 
 | Secret | Value |
 | --- | --- |
-| `MACOS_CERTIFICATE_P12` | Base64 of the password-protected certificate/key P12 exported securely by its owner |
+| `MACOS_CERTIFICATE_P12` | Base64 of the password-protected certificate/key P12 supplied securely by its owner |
 | `MACOS_CERTIFICATE_PASSWORD` | P12 export password |
 | `MACOS_SIGN_IDENTITY` | Exact `Developer ID Application: … (TEAMID)` identity |
-| `MACOS_NOTARY_PROFILE` | A chosen profile name (not a pre-existing runner profile) |
+
+Preferred notarization path: an App Store Connect **team API key** with issuer ID.
+Individual API keys are not supported by this workflow.
+
+| Secret | Value |
+| --- | --- |
+| `MACOS_NOTARY_KEY_ID` | Team API key identifier |
+| `MACOS_NOTARY_ISSUER_ID` | Team API key issuer identifier |
+| `MACOS_NOTARY_KEY_P8` | Raw multiline P8 private-key contents (not base64) |
+
+If any API secret is nonempty, all three are required and API authentication wins,
+even if complete Apple ID credentials also exist. Partial API data fails; it
+never silently falls back to Apple ID authentication.
+
+Retained legacy path: leave all API secrets empty or unset and configure:
+
+| Secret | Value |
+| --- | --- |
 | `MACOS_NOTARY_APPLE_ID` | Authorized Apple ID for notarization |
 | `MACOS_NOTARY_TEAM_ID` | Developer team identifier |
 | `MACOS_NOTARY_APP_PASSWORD` | Apple-generated app-specific password |
 
+`MACOS_NOTARY_PROFILE` is optional in both paths and defaults to `plume-notary`.
+An explicit profile name is preserved. It is a name, not an existing profile on
+an ephemeral runner and not private credential material. The script initializes
+it in the temporary signing keychain every time.
+
 Restrict repository write/tag privileges and protect releases. Keep credentials
-out of fork pull-request workflows. Rotate/revoke the app-specific password and
-certificate secrets if access changes. This change does not create/export keys
+out of fork pull-request workflows. Rotate/revoke API keys, app-specific passwords
+and certificate secrets if access changes. This change does not create/export keys
 or provision any credential.
 
-Every `v*` tag fails before building if a credential is absent. Public artifacts
-never fall back to ad hoc. `scripts/release-signed.sh` creates a temporary signing
+Every `v*` tag runs `scripts/release-signed.sh --preflight` before building. The
+normal signing path calls the same preflight before writing private files,
+creating a keychain or invoking a build. Missing signing/selected-authentication
+credentials or a non-Developer-ID identity fail before those effects. Public
+artifacts never fall back to ad hoc. `scripts/release-signed.sh` creates a temporary signing
 keychain, imports the P12, explicitly creates the notarytool credentials profile
-in that keychain, signs with hardened runtime, a secure timestamp and the existing
+in that keychain using the selected API-key or Apple ID path. In API mode the raw
+P8 is written under its private temporary directory with mode 0600 and retained
+through both submissions; cleanup removes it on success, failure and handled
+signals. The script signs with hardened runtime, a secure timestamp and the existing
 audio entitlement, and requires `Accepted`. It staples and validates the app,
 then packages the compatible ZIP from that stapled app. It constructs, signs,
 notarizes, staples and validates the DMG and writes SHA256 sidecars for both.
