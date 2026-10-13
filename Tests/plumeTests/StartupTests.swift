@@ -163,6 +163,18 @@ final class StartupTests: XCTestCase {
         XCTAssertFalse(state.canCapture)
     }
 
+    func testPermissionsAndLoginWaitForTheFirstActualLocationSnapshot() {
+        let state = state(); state.updateReadiness(granted); state.setPreparation(.ready)
+        var requests = 0
+        let services = StartupServices(snapshot: { _ in StartupReadiness(installedLocation: false) },
+            warmUp: { _ in }, requestMicrophone: { requests += 1 },
+            requestAccessibility: { requests += 1 }, setLogin: { _ in requests += 1 })
+        let startup = StartupController(state: state, store: OnboardingStore(defaults: defaults),
+            services: services, presentWindow: false, showSettings: {})
+        startup.requestMicrophone(); startup.requestAccessibility(); startup.setLogin(true)
+        XCTAssertEqual(requests, 0)
+    }
+
     func testTransientBundleDoesNotRequestPermissionsOrRegisterLogin() async {
         let state = state()
         var requests = 0

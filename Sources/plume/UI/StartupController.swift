@@ -180,15 +180,15 @@ final class StartupController: NSObject, ObservableObject, NSApplicationDelegate
     }
 
     func requestMicrophone() {
-        guard state.readiness.installedLocation else { return }
+        guard hasRefreshed, state.readiness.installedLocation else { return }
         services.requestMicrophone()
     }
     func requestAccessibility() {
-        guard state.readiness.installedLocation else { return }
+        guard hasRefreshed, state.readiness.installedLocation else { return }
         services.requestAccessibility()
     }
     func setLogin(_ enabled: Bool) {
-        guard completed || state.canCapture, state.readiness.installedLocation else { return }
+        guard hasRefreshed, completed || state.canCapture, state.readiness.installedLocation else { return }
         do {
             try services.setLogin(enabled)
             loginEnabled = enabled
@@ -234,7 +234,7 @@ final class StartupController: NSObject, ObservableObject, NSApplicationDelegate
     /// Open the installed bundle only after this process has exited; opening it
     /// first would just deliver a reopen event to this same cached TCC process.
     func relaunch() {
-        guard state.readiness.installedLocation, Bundle.main.bundleURL.pathExtension == "app" else { return }
+        guard hasRefreshed, state.readiness.installedLocation, Bundle.main.bundleURL.pathExtension == "app" else { return }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$2\"",
@@ -272,7 +272,7 @@ struct OnboardingView: View {
                 Button("Check again") { startup.refresh() }.disabled(startup.checking)
                 if state.readiness.installedLocation && !state.readiness.conflictingBundle {
                     if startup.step == .welcome {
-                        Button("Get started") { startup.advance() }.keyboardShortcut(.defaultAction)
+                        Button("Get started") { startup.advance() }.disabled(startup.checking).keyboardShortcut(.defaultAction)
                     } else if startup.step == .test {
                         Button("Finish") { startup.finish() }.disabled(!state.canCapture).keyboardShortcut(.defaultAction)
                     } else if startup.step == .permissions || startup.step == .hotkey {
