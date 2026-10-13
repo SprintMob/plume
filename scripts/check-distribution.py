@@ -73,11 +73,15 @@ class ReleaseAuthenticationTests(unittest.TestCase):
         path.write_text("#!/usr/bin/env python3\n" + body)
         path.chmod(0o755)
 
-    def run_script(self, values, preflight=True):
+    def run_script(self, values, preflight=True, use_tmpdir=False):
         env = {key: value for key, value in os.environ.items() if not key.startswith("MACOS_")}
         env.update(values)
-        env.update(PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
-                   RUNNER_TEMP=str(self.root), AUTH_TEST_LOG=str(self.log))
+        env.update(PATH=str(self.bin) + os.pathsep + os.environ["PATH"], AUTH_TEST_LOG=str(self.log))
+        if use_tmpdir:
+            env.pop("RUNNER_TEMP", None)
+            env["TMPDIR"] = str(self.root)
+        else:
+            env["RUNNER_TEMP"] = str(self.root)
         result = subprocess.run(["/bin/bash", str(self.SCRIPT)] + (["--preflight"] if preflight else []),
                                 env=env, capture_output=True, text=True)
         for value in values.values():
@@ -252,11 +256,14 @@ def finish(status=0):
 if name == 'security':
     command = args[0]
     if command == 'create-keychain':
-        state['temporary'] = args[-1]
+        state['temporary'] = str(pathlib.Path(args[-1]).resolve()) if state['mode'] == 'normalized-paths' else args[-1]
         pathlib.Path(args[-1]).write_text('dummy keychain file')
     elif command == 'list-keychains':
         if '-s' in args:
             state['search'] = args[args.index('-s') + 1:]
+            if state['mode'] == 'normalized-paths':
+                state['search'] = [str(pathlib.Path(path).resolve()) if path.endswith('/signing.keychain-db') else path
+                                   for path in state['search']]
             if state['mode'] == 'registration-failure' and state['temporary'] in state['search']:
                 finish(68)
         elif state['mode'] == 'malformed-list':
@@ -285,6 +292,8 @@ elif name == 'xcrun':
         print('<plist version="1.0"><dict><key>status</key><string>Accepted</string></dict></plist>')
 elif name == 'codesign' and '--sign' in args:
     keychain = args[args.index('--keychain') + 1]
+    if state['mode'] == 'normalized-paths':
+        keychain = str(pathlib.Path(keychain).resolve())
     if keychain != state['temporary'] or keychain not in state['search']:
         finish(77)
     if not state.get('external_updated'):
@@ -327,9 +336,10 @@ codesign --keychain "$keychain" --sign "$MACOS_SIGN_IDENTITY" dist/plume-macos-a
             "default": self.original[0], "external_remove": external_remove,
         }))
 
-    def run_release(self):
+    def run_release(self, use_tmpdir=False):
         result = self.auth.run_script(self.auth.COMMON | self.auth.API
-                                      | {"MOCK_KEYCHAIN_STATE": str(self.state_path)}, preflight=False)
+                                      | {"MOCK_KEYCHAIN_STATE": str(self.state_path)},
+                                      preflight=False, use_tmpdir=use_tmpdir)
         self.state = json.loads(self.state_path.read_text())
         self.records = [json.loads(line) for line in self.auth.log.read_text().splitlines()]
         return result
@@ -339,6 +349,10 @@ codesign --keychain "$keychain" --sign "$MACOS_SIGN_IDENTITY" dist/plume-macos-a
         self.assertEqual(self.state['default'], self.original[0])
         self.assertFalse(any(record['command'] == 'security' and record['args'][0] == 'default-keychain'
                              for record in self.records))
+        deletions = [record for record in self.records
+                     if record['command'] == 'security' and record['args'][0] == 'delete-keychain']
+        self.assertEqual(len(deletions), 1)
+        self.assertNotIn(self.state['temporary'], deletions[0]['search'])
         self.assertFalse(Path(self.state['temporary']).exists())
         self.assertFalse(Path(self.state['temporary']).parent.exists())
         self.assertEqual(list(self.auth.root.glob('plume-signing.*')), [])
@@ -403,6 +417,32 @@ codesign --keychain "$keychain" --sign "$MACOS_SIGN_IDENTITY" dist/plume-macos-a
         result = self.run_release()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assert_cleanup([])
+
+    def test_tmpdir_alias_is_canonical_before_registration_and_removal_before_delete(self):
+        alias = self.auth.root.parent / 'logical temporary alias with spaces'
+        alias.symlink_to(self.auth.root, target_is_directory=True)
+        self.auth.root = alias
+        self.write_state(mode='normalized-paths')
+        result = self.run_release(use_tmpdir=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        creation = next(record for record in self.records
+                        if record['command'] == 'security' and record['args'][0] == 'create-keychain')
+        temporary = creation['args'][-1]
+        self.assertEqual(temporary, str(Path(temporary).resolve()))
+        self.assertNotIn('logical temporary alias', temporary)
+        self.assert_cleanup(self.original + self.external)
+
+    def test_canonicalization_failure_or_empty_result_removes_initial_directory_without_keychain_effects(self):
+        for body in ['return 70', 'return 0']:
+            with self.subTest(pwd_behavior=body):
+                startup = self.auth.root / 'canonicalization-failure.sh'
+                startup.write_text('pwd() { ' + body + '; }' + chr(10))
+                result = self.auth.run_script(self.auth.COMMON | self.auth.API
+                                              | {'BASH_ENV': str(startup)}, preflight=False)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn('could not resolve the temporary signing directory', result.stderr)
+                self.assertFalse(self.auth.log.exists())
+                self.assertEqual(list(self.auth.root.glob('plume-signing.*')), [])
 
     def test_malformed_list_fails_without_overwriting_unrelated_entries(self):
         self.write_state(mode="malformed-list")

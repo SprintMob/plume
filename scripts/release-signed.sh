@@ -41,7 +41,14 @@ if [ "$PREFLIGHT_ONLY" = true ]; then
   exit 0
 fi
 
-WORK=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/plume-signing.XXXXXX")
+INITIAL_WORK=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/plume-signing.XXXXXX")
+# security normalizes paths such as /tmp to /private/tmp in the search list.
+# Use the physical path consistently before deriving the keychain name.
+if ! WORK=$(cd "$INITIAL_WORK" >/dev/null && pwd -P) || [ -z "$WORK" ]; then
+  echo "could not resolve the temporary signing directory" >&2
+  rm -rf -- "$INITIAL_WORK" || echo "could not remove the initial signing directory" >&2
+  exit 1
+fi
 KEYCHAIN="$WORK/signing.keychain-db"
 KEYCHAIN_MAY_EXIST=false
 
