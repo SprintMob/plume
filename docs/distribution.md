@@ -102,17 +102,22 @@ normal signing path calls the same preflight before writing private files,
 creating a keychain or invoking a build. Missing signing/selected-authentication
 credentials or a non-Developer-ID identity fail before those effects. Public
 artifacts never fall back to ad hoc. `scripts/release-signed.sh` creates a temporary signing
-keychain, imports the P12, explicitly creates the notarytool credentials profile
-in that keychain using the selected API-key or Apple ID path. In API mode the raw
+keychain, registers it in the user's search list without changing the default
+keychain or removing other entries, imports the P12, and explicitly creates the
+notarytool credentials profile in that keychain using the selected API-key or
+Apple ID path. In API mode the raw
 P8 is written under its private temporary directory with mode 0600 and retained
 through both submissions; cleanup removes it on success, failure and handled
 signals. The script signs with hardened runtime, a secure timestamp and the existing
 audio entitlement, and requires `Accepted`. It staples and validates the app,
 then packages the compatible ZIP from that stapled app. It constructs, signs,
 notarizes, staples and validates the DMG and writes SHA256 sidecars for both.
-Its EXIT trap deletes certificate material and the temporary keychain on success
-or failure. `workflow_dispatch` from an ordinary branch remains an ad-hoc smoke
-build; it does not publish a release.
+Its cleanup removes only its temporary entry from a freshly read search list,
+then deletes certificate/key material and the temporary keychain on success,
+failure or handled signals. External search-list additions and removals during
+the build are preserved; cleanup never restores a stale original snapshot.
+`workflow_dispatch` from an ordinary branch remains an ad-hoc smoke build; it does
+not publish a release.
 
 ## Local smoke checks
 

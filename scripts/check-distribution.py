@@ -218,5 +218,200 @@ sys.exit(72)
             self.assertEqual(workflow.count('${{ secrets.' + name + ' }}'), 2)
 
 
+class ReleaseKeychainTests(unittest.TestCase):
+    def setUp(self):
+        self.auth = ReleaseAuthenticationTests()
+        self.auth.setUp()
+        self.addCleanup(self.auth.doCleanups)
+        self.fixture = self.auth.root / "repository with spaces"
+        scripts = self.fixture / "scripts"
+        scripts.mkdir(parents=True)
+        # Run the production lifecycle in an isolated repository. Only the
+        # unrelated absolute plist-reader path is routed to a mock too.
+        self.auth.SCRIPT = scripts / "release-signed.sh"
+        self.auth.SCRIPT.write_text(ReleaseAuthenticationTests.SCRIPT.read_text()
+                                   .replace("/usr/libexec/PlistBuddy", "plistbuddy"))
+        self.auth.root = self.auth.root / "runner temp with spaces"
+        self.auth.root.mkdir()
+        self.state_path = self.auth.root / "mock-state.json"
+        self.original = ["/Users/Dummy/Keychains/login with spaces.keychain-db",
+                         "/Library/Keychains/System.keychain"]
+        self.external = ["/Users/Dummy/Keychains/external addition.keychain-db"]
+        self.write_state()
+        (self.auth.bin / "mktemp").unlink()
+        mock = r"""import json, os, pathlib, signal, sys
+name = pathlib.Path(sys.argv[0]).name
+args = sys.argv[1:]
+state_path = pathlib.Path(os.environ['MOCK_KEYCHAIN_STATE'])
+state = json.loads(state_path.read_text())
+with pathlib.Path(os.environ['AUTH_TEST_LOG']).open('a') as log:
+    log.write(json.dumps({'command': name, 'args': args, 'search': state['search'][:]}) + chr(10))
+def finish(status=0):
+    state_path.write_text(json.dumps(state))
+    sys.exit(status)
+if name == 'security':
+    command = args[0]
+    if command == 'create-keychain':
+        state['temporary'] = args[-1]
+        pathlib.Path(args[-1]).write_text('dummy keychain file')
+    elif command == 'list-keychains':
+        if '-s' in args:
+            state['search'] = args[args.index('-s') + 1:]
+            if state['mode'] == 'registration-failure' and state['temporary'] in state['search']:
+                finish(68)
+        elif state['mode'] == 'malformed-list':
+            print('not a quoted keychain path')
+        else:
+            for path in state['search']:
+                print('    "' + path + '"')
+    elif command == 'delete-keychain':
+        # Deliberately leave the mock search list alone: cleanup must remove
+        # TEMP itself instead of tests accidentally relying on deletion doing it.
+        if state['mode'] in ['interrupt', 'terminate']:
+            # A repeated signal during cleanup must not leave private files.
+            os.kill(os.getppid(), signal.SIGTERM)
+        pathlib.Path(args[1]).unlink(missing_ok=True)
+    elif command == 'default-keychain':
+        finish(97)
+    elif command not in ['set-keychain-settings', 'unlock-keychain', 'import', 'set-key-partition-list']:
+        finish(98)
+elif name == 'openssl':
+    print('dummy-keychain-password')
+elif name == 'xcrun':
+    if args[:2] in [['notarytool', 'store-credentials'], ['notarytool', 'submit']]:
+        if state['temporary'] not in state['search']:
+            finish(77)
+    if args[:2] == ['notarytool', 'submit']:
+        print('<plist version="1.0"><dict><key>status</key><string>Accepted</string></dict></plist>')
+elif name == 'codesign' and '--sign' in args:
+    keychain = args[args.index('--keychain') + 1]
+    if keychain != state['temporary'] or keychain not in state['search']:
+        finish(77)
+    if not state.get('external_updated'):
+        state['search'].extend(state['external'])
+        if state.get('external_remove'):
+            state['search'].remove(state['external_remove'])
+        state['external_updated'] = True
+    if state['mode'] == 'codesign-failure':
+        finish(71)
+    if state['mode'] in ['interrupt', 'terminate']:
+        state_path.write_text(json.dumps(state))
+        os.kill(os.getppid(), signal.SIGINT if state['mode'] == 'interrupt' else signal.SIGTERM)
+elif name == 'ditto':
+    pathlib.Path(args[-1]).write_text('dummy ZIP')
+elif name == 'plistbuddy':
+    print('Accepted')
+elif name == 'shasum':
+    print('0' * 64 + '  ' + args[-1])
+finish()
+"""
+        for command in ["security", "openssl", "xcrun", "codesign", "ditto", "spctl", "shasum", "plistbuddy"]:
+            self.auth.stub(command, mock)
+        (scripts / "bundle.sh").write_text("#!/bin/bash\nset -e\nmkdir -p dist/Plume.app\nprintf dummy > dist/Plume.app/executable\n")
+        (scripts / "dmg.sh").write_text("""#!/bin/bash
+set -e
+keychain=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in --keychain) keychain="$2"; shift 2 ;; *) shift ;; esac
+done
+printf dummy > dist/plume-macos-arm64.dmg
+codesign --keychain "$keychain" --sign "$MACOS_SIGN_IDENTITY" dist/plume-macos-arm64.dmg
+""")
+        (scripts / "bundle.sh").chmod(0o755)
+        (scripts / "dmg.sh").chmod(0o755)
+
+    def write_state(self, mode="success", original=None, external_remove=None):
+        self.state_path.write_text(json.dumps({
+            "search": self.original if original is None else original,
+            "external": self.external, "mode": mode,
+            "default": self.original[0], "external_remove": external_remove,
+        }))
+
+    def run_release(self):
+        result = self.auth.run_script(self.auth.COMMON | self.auth.API
+                                      | {"MOCK_KEYCHAIN_STATE": str(self.state_path)}, preflight=False)
+        self.state = json.loads(self.state_path.read_text())
+        self.records = [json.loads(line) for line in self.auth.log.read_text().splitlines()]
+        return result
+
+    def assert_cleanup(self, expected):
+        self.assertEqual(self.state['search'], expected)
+        self.assertEqual(self.state['default'], self.original[0])
+        self.assertFalse(any(record['command'] == 'security' and record['args'][0] == 'default-keychain'
+                             for record in self.records))
+        self.assertFalse(Path(self.state['temporary']).exists())
+        self.assertFalse(Path(self.state['temporary']).parent.exists())
+        self.assertEqual(list(self.auth.root.glob('plume-signing.*')), [])
+
+    def test_registered_before_notary_and_signing_then_preserves_external_additions(self):
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        temporary = self.state['temporary']
+        sets = [record['args'][4:] for record in self.records
+                if record['command'] == 'security' and record['args'][:4] == ['list-keychains', '-d', 'user', '-s']]
+        self.assertEqual(sets, [[temporary] + self.original, self.original + self.external])
+        signs = [record for record in self.records if record['command'] == 'codesign' and '--sign' in record['args']]
+        self.assertEqual(len(signs), 2)
+        notary = [record for record in self.records if record['command'] == 'xcrun' and record['args'][0] == 'notarytool']
+        self.assertEqual(len(notary), 3)
+        for record in signs + notary:
+            self.assertIn(temporary, record['search'])
+        self.assertIn(' ', temporary)
+        self.assert_cleanup(self.original + self.external)
+
+    def test_failure_during_signing_removes_only_temp_and_preserves_external_additions(self):
+        self.write_state(mode="codesign-failure")
+        result = self.run_release()
+        self.assertEqual(result.returncode, 71)
+        self.assert_cleanup(self.original + self.external)
+
+    def test_failed_registration_is_cleaned_even_if_command_partially_changed_list(self):
+        self.write_state(mode="registration-failure")
+        result = self.run_release()
+        self.assertEqual(result.returncode, 68)
+        self.assert_cleanup(self.original)
+
+    def test_handled_interrupt_and_termination_clean_up_current_list(self):
+        for mode, code in [('interrupt', 130), ('terminate', 143)]:
+            with self.subTest(signal=mode):
+                self.write_state(mode=mode)
+                if self.auth.log.exists():
+                    self.auth.log.unlink()
+                result = self.run_release()
+                self.assertEqual(result.returncode, code)
+                self.assert_cleanup(self.original + self.external)
+
+    def test_cleanup_preserves_external_removal_instead_of_restoring_snapshot(self):
+        self.write_state(external_remove=self.original[1])
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_cleanup([self.original[0]] + self.external)
+
+    def test_quoted_spaces_and_metacharacters_are_literal_without_eval(self):
+        marker = self.auth.root / 'must-not-exist'
+        special = '/Users/Dummy/Keychains/quoted "value" \\ $(touch ' + str(marker) + '); space.keychain-db'
+        original = self.original + [special]
+        self.write_state(original=original)
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_cleanup(original + self.external)
+        self.assertFalse(marker.exists())
+
+    def test_empty_original_list_is_restored_without_unbound_array_errors(self):
+        self.external = []
+        self.write_state(original=[])
+        result = self.run_release()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_cleanup([])
+
+    def test_malformed_list_fails_without_overwriting_unrelated_entries(self):
+        self.write_state(mode="malformed-list")
+        result = self.run_release()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('could not parse', result.stderr)
+        self.assertFalse(any(record['command'] == 'security' and '-s' in record['args'] for record in self.records))
+        self.assert_cleanup(self.original)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -43,17 +43,82 @@ fi
 
 WORK=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/plume-signing.XXXXXX")
 KEYCHAIN="$WORK/signing.keychain-db"
-KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+KEYCHAIN_MAY_EXIST=false
+
+# security prints one quoted path per line. Strip only the surrounding whitespace
+# and quotes: read -r and quoted arrays preserve spaces and shell metacharacters.
+# Never eval the output or split it on whitespace.
+read_user_keychains() {
+  SEARCH_KEYCHAINS=()
+  security list-keychains -d user > "$WORK/search-list.txt" || return 1
+  local entry
+  while IFS= read -r entry || [ -n "$entry" ]; do
+    entry="${entry#"${entry%%[![:space:]]*}"}"
+    entry="${entry%"${entry##*[![:space:]]}"}"
+    [ -n "$entry" ] || continue
+    case "$entry" in
+      \"*\") entry="${entry#\"}"; entry="${entry%\"}" ;;
+      *) echo "could not parse the user keychain search list" >&2; return 1 ;;
+    esac
+    [ -n "$entry" ] || { echo "empty user keychain search-list entry" >&2; return 1; }
+    SEARCH_KEYCHAINS+=("$entry")
+  done < "$WORK/search-list.txt"
+}
+
+register_keychain() {
+  read_user_keychains || return 1
+  local updated=("$KEYCHAIN") entry
+  for entry in ${SEARCH_KEYCHAINS[@]+"${SEARCH_KEYCHAINS[@]}"}; do
+    [ "$entry" = "$KEYCHAIN" ] || updated+=("$entry")
+  done
+  security list-keychains -d user -s "${updated[@]}"
+}
+
+unregister_keychain() {
+  # Read again instead of restoring a snapshot: preserve entries added/removed
+  # by other processes during the build, along with their current order.
+  read_user_keychains || return 1
+  local remaining=() entry found=false
+  for entry in ${SEARCH_KEYCHAINS[@]+"${SEARCH_KEYCHAINS[@]}"}; do
+    if [ "$entry" = "$KEYCHAIN" ]; then found=true
+    else remaining+=("$entry"); fi
+  done
+  if [ "$found" = true ]; then
+    security list-keychains -d user -s ${remaining[@]+"${remaining[@]}"} || return 1
+  fi
+}
+
 cleanup() {
-  security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
-  rm -rf "$WORK"
+  local status=$?
+  trap - EXIT
+  # Finish cleanup even if another handled signal arrives while it is running.
+  trap '' INT TERM
+  if [ "$KEYCHAIN_MAY_EXIST" = true ]; then
+    if ! unregister_keychain; then
+      echo "could not remove the temporary signing keychain from the search list" >&2
+      [ "$status" -ne 0 ] || status=1
+    fi
+    if ! security delete-keychain "$KEYCHAIN" >/dev/null 2>&1; then
+      echo "could not delete the temporary signing keychain" >&2
+      [ "$status" -ne 0 ] || status=1
+    fi
+  fi
+  if ! rm -rf "$WORK"; then
+    echo "could not remove temporary signing files" >&2
+    [ "$status" -ne 0 ] || status=1
+  fi
+  exit "$status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 umask 077
+KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
 printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$WORK/certificate.p12"
+# Mark before creation so cleanup also handles a partially failed create/register.
+KEYCHAIN_MAY_EXIST=true
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+register_keychain
 security set-keychain-settings -lut 21600 "$KEYCHAIN"
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 security import "$WORK/certificate.p12" -k "$KEYCHAIN" \
