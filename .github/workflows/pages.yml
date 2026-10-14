@@ -12,6 +12,8 @@ on:
     paths:
       - "site/**"
       - "scripts/install.sh"
+      - "scripts/build-distribution.py"
+      - "distribution.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -35,9 +37,8 @@ jobs:
 
       - name: assemble
         run: |
-          mkdir -p _site
-          cp -R site/. _site/
-          cp scripts/install.sh _site/install.sh
+          python3 scripts/build-distribution.py --check
+          python3 scripts/build-distribution.py --output _site
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

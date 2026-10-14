@@ -178,3 +178,12 @@ the main menu is built in code"; there is one now, and the menu is still built
 in code, because a `MainMenu.nib` needs Xcode and `ibtool`, which this repo does
 not have and does not want. The justification changes from "there is no bundle"
 to "there is no nib, because there is no Xcode project."
+
+## Public distribution superseded by ADR-0009
+
+The ad-hoc/Gatekeeper discussion above records the releases available when this
+decision was written and still applies to v0.1.0 and local builds.
+[ADR-0009](./0009-guided-installation-and-signed-distribution.md) requires signing
+and notarization for future public tags and gates the browser download until a
+stable DMG is actually published. The launch-agent, shim and privacy decisions
+in this ADR remain in force.

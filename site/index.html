@@ -49,6 +49,7 @@
   /* The command is the point of the page. It is the largest interactive thing
      on it, and clicking it copies. */
   .command {
+    display: block; text-decoration: none;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -106,12 +107,14 @@
   <p class="lede">Hold a key, speak, release. The text is at your cursor in
   under 500&nbsp;ms, and the audio never left the Mac.</p>
 
-  <button class="command" id="copy" type="button">
+  <!-- download:start -->
+<button class="command" id="copy" type="button">
     <code>curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh</code>
     <span class="hint" id="hint">copy</span>
   </button>
-  <p class="req">macOS 14 or later, Apple Silicon. Transcription runs on the
-  Neural Engine, so Intel Macs are not supported.</p>
+  <p class="req">macOS 14+ · Apple Silicon. The recommended speech model downloads
+  about 461 MB on first setup. A signed browser download is not available yet.</p>
+<!-- download:end -->
 
   <section>
     <h2>What it is</h2>
@@ -119,7 +122,7 @@
     talk, let go, and the transcript is typed where your cursor is. Double-tap
     to keep recording without holding.</p>
     <p><strong>Transcription happens on this Mac.</strong> There is no account,
-    no API key and no network call, because the model runs on the Apple Neural
+    no API key and no speech sent to a server, because the model runs on the Apple Neural
     Engine. <strong>No transcript is written to disk</strong>, ever: the session
     history is in memory and dies with the process.</p>
     <p>The app is 7&nbsp;MB. It has one key, and the settings window exposes
@@ -128,12 +131,9 @@
 
   <section>
     <h2>Honestly</h2>
-    <p>Plume is not notarized yet, so a build downloaded through a browser is
-    blocked by Gatekeeper and every update costs you the Accessibility
-    permission until you re-grant it. The installer above does not go through a
-    browser, so it is not affected. The
-    <a href="https://github.com/sprintmob/plume#plume-is-not-notarized">README
-    explains both</a> rather than hiding them.</p>
+    <!-- signature:start -->
+<p>The current v0.1.0 release is ad hoc and is not notarized. A browser download is blocked by Gatekeeper; the CLI installer above remains the supported path. Each ad-hoc update needs a new Accessibility grant. <a href="https://github.com/SprintMob/plume#current-release-signature">Read the details.</a></p>
+<!-- signature:end -->
     <p>Most of the code was written by people who opened pull requests against
     <a href="https://github.com/digimata/parrot">the project this forks</a> and
     never got a review. They are named in the
@@ -151,7 +151,7 @@
   // selectable, which is all it has to be.
   const button = document.getElementById("copy");
   const hint = document.getElementById("hint");
-  button.addEventListener("click", async () => {
+  button?.addEventListener("click", async () => {
     const command = button.querySelector("code").textContent;
     try {
       await navigator.clipboard.writeText(command);

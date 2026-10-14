@@ -5,13 +5,19 @@
 Hold a key, speak, release. The text is at your cursor in under 500 ms, and the
 audio never left the Mac.
 
+<!-- download:start -->
 ```sh
 curl -fsSL https://raw.githubusercontent.com/SprintMob/plume/main/scripts/install.sh | sh
 "$HOME/.local/bin/plume" setup
 ```
 
+The CLI installer is the live installation path. A signed browser download is
+staged for a future stable release; it is not available yet. First setup downloads
+about 461 MB for the recommended Parakeet TDT v3 model. macOS 14+ and Apple Silicon required.
+<!-- download:end -->
+
 A macOS dictation daemon by [SprintMob](https://sprintmob.com). On-device
-transcription on the Apple Neural Engine, no account, no network call, no
+transcription on the Apple Neural Engine, no account, no speech upload, no
 transcript written to disk.
 
 **Requires:** macOS 14 or later on Apple Silicon. Transcription runs on the
@@ -44,10 +50,11 @@ vipergsm, justinhnaylor, Entrepenulian, augiefra, tomiiide, imtamiliniyan and
 L65FREAD. [NOTICE](NOTICE) says who wrote what. SprintMob publishes it; SprintMob
 did not write most of it.
 
-## Plume is not notarized
+## Current release signature
 
-SprintMob does not have an Apple Developer ID yet, so the app carries an ad-hoc
-signature. Two consequences, and neither is hidden:
+The current v0.1.0 release carries an ad-hoc signature and is not notarized.
+Future public tag releases require Developer ID signing and notarization; local
+builds remain ad hoc. Two consequences, and neither is hidden:
 
 1. **If you download the zip in a browser**, macOS quarantines it and refuses to
    open it. The message is "Plume is damaged and can't be opened," which is what
@@ -57,17 +64,21 @@ signature. Two consequences, and neither is hidden:
    `xattr -dr com.apple.quarantine "$HOME/Applications/Plume.app"`.
 2. **Every update costs you the Accessibility grant.** An ad-hoc signature is
    anchored to the exact bytes of the build, so macOS treats each release as a
-   different application. After updating, Plume will still record and
-   transcribe, and will silently stop typing at the cursor until you re-enable
+   different application. After updating, guided setup blocks dictation until you re-enable
    it under System Settings → Privacy & Security → Accessibility. `plume doctor`
    will tell you that is what happened.
 
-Both go away the day we ship a Developer ID-signed, notarized build. The reason
-to buy one is the second point, not the first.
+A future Developer ID-signed, notarized release enables the ordinary browser
+download. See [release provisioning](docs/distribution.md) for the manual Apple
+prerequisite and the explicit availability switch.
 
 ## How to use
 
-1. **Run it.** Either `plume install --launch-at-login`, which runs it forever
+1. **Open Plume.app** for welcome, user-initiated microphone and Accessibility
+   access, keyboard configuration, model preparation and a test field. Launch at
+   login starts off. Existing finished installations run quietly; permission
+   changes reopen recovery. Closing setup keeps progress and never marks it
+   finished. You can also run it with `plume install --launch-at-login`, which runs it forever
    from the menu bar, or `plume` in any terminal tab.
 2. **Click into the text field you want to dictate into.** Messages, the address
    bar, a Slack thread, anywhere a cursor blinks.
@@ -266,3 +277,6 @@ MIT. Two copyright lines over one unmodified MIT body: Andrew Jones, who wrote
 parrot, and SprintMob, who publishes this. See [LICENSE](LICENSE),
 [NOTICE](NOTICE) for the lineage, and [THIRD-PARTY.md](THIRD-PARTY.md) for the
 dependencies, two of which are Apache-2.0 and whose notices ship inside the app.
+
+See [distribution and release checks](docs/distribution.md) for DMG packaging,
+secure signing setup, and the staged browser-download instructions.

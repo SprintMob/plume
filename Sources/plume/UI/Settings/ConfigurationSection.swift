@@ -92,7 +92,7 @@ struct ConfigurationSection: View {
             guard wanted != Install.isAgentInstalled else { return }
             do {
                 if wanted {
-                    try Install.writeAgent(logFile: false)
+                    try Install.writeAgent(logFile: false, restartLoaded: false)
                 } else {
                     try Install.removeAgent()
                 }

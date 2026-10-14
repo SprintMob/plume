@@ -8,3 +8,6 @@
 .tasks/
 dist/
 site/install.sh
+
+# Python distribution-script bytecode
+scripts/__pycache__/

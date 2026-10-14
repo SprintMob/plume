@@ -46,3 +46,14 @@ jobs:
 
       - name: the rename left nothing behind
         run: ./scripts/check-rename.sh
+
+      - name: distribution gate and scripts
+        run: |
+          python3 scripts/check-distribution.py
+          python3 scripts/build-distribution.py --check
+          for script in scripts/*.sh; do bash -n "$script"; done
+
+      - name: ad-hoc DMG smoke
+        run: |
+          ./scripts/dmg.sh --app /tmp/bundlecheck/Plume.app --output /tmp/bundlecheck
+          hdiutil verify /tmp/bundlecheck/plume-macos-arm64.dmg

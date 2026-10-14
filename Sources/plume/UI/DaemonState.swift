@@ -22,6 +22,39 @@ final class DaemonState: ObservableObject {
 
     @Published private(set) var dictation: Dictation = .idle
 
+    @Published private(set) var preparation: Preparation = .waiting
+    @Published private(set) var readiness = StartupReadiness()
+    var canCapture: Bool {
+        preparation == .ready && readiness.permitsPreparation(hotkey: hotkey)
+            && pendingModel == nil
+    }
+    /// A loaded model can still be blocked. Both status surfaces use this
+    /// reason instead of presenting model preparation as capture readiness.
+    var captureBlockerDescription: String? {
+        if !readiness.installedLocation { return "Move Plume to Applications" }
+        if readiness.conflictingBundle { return "Another Plume is running" }
+        if !readiness.microphone { return "Microphone access required" }
+        if !readiness.accessibility { return "Accessibility access required" }
+        if hotkey == .fn && !readiness.fnConfigured { return "Configure the Fn key" }
+        if let pending = pendingModel {
+            if let fraction = switchProgress, fraction < 1 {
+                return "Downloading \(pending.displayName) · \(Int(fraction * 100))%"
+            }
+            return "Loading \(pending.displayName)…"
+        }
+        return preparation == .ready ? nil : preparation.description
+    }
+
+    var onReadinessChanged: (() -> Void)?
+    func updateReadiness(_ facts: StartupReadiness) {
+        readiness = facts
+        onReadinessChanged?()
+    }
+    func setPreparation(_ next: Preparation) {
+        preparation = next
+        onReadinessChanged?()
+    }
+
     // MARK: - The model
 
     @Published private(set) var model: TranscriptionModel
@@ -114,7 +147,7 @@ final class DaemonState: ObservableObject {
     /// Entry point for both surfaces. Records the choice, then hands it to the
     /// daemon, which loads the new model before dropping the one in use.
     func selectModel(_ next: TranscriptionModel) {
-        guard next.id != model.id, pendingModel == nil else { return }
+        guard preparation == .ready, dictation == .idle, next.id != model.id, pendingModel == nil else { return }
         pendingModel = next
         switchProgress = nil
         failedModel = nil
@@ -131,11 +164,13 @@ final class DaemonState: ObservableObject {
         pendingModel = nil
         switchProgress = nil
         failedModel = nil
+        onReadinessChanged?()
     }
 
     func switchFailed(_ attempted: TranscriptionModel) {
         pendingModel = nil
         switchProgress = nil
         failedModel = attempted
+        onReadinessChanged?()
     }
 }

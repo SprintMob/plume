@@ -1,106 +1,80 @@
 name: release
-
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
-    name: build and sign Plume.app
+    name: package Plume for Apple Silicon
     runs-on: macos-15
-    timeout-minutes: 30
-    env:
-      HAS_SIGNING_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
-
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
+      # Fail before spending build time; public tags never fall back to ad hoc.
+      - name: require public release credentials
+        if: github.ref_type == 'tag'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_P8: ${{ secrets.MACOS_NOTARY_KEY_P8 }}
+          MACOS_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+        run: ./scripts/release-signed.sh --preflight
       - name: swift version
         run: swift --version
-
-      - name: cache SwiftPM
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             .build
             ~/Library/Caches/org.swift.swiftpm
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
-
-      # Tier 0. Ad-hoc, no Apple account needed, which is what ships today.
-      # bundle.sh builds, strips before signing (after invalidates
-      # CodeResources and macOS then calls the app damaged), and verifies.
-      #
-      # PLUME_VERSION is passed explicitly rather than left to git describe, so
-      # a release never depends on how deep the checkout fetched.
-      - name: bundle
+      - name: tests
+        run: swift test
+      - name: signed and notarized public artifacts
+        if: github.ref_type == 'tag'
         env:
-          PLUME_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0' }}
+          PLUME_VERSION: ${{ github.ref_name }}
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_P8: ${{ secrets.MACOS_NOTARY_KEY_P8 }}
+          MACOS_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
         run: |
-          VERSION="${PLUME_VERSION#v}"
-          PLUME_VERSION="$VERSION" ./scripts/bundle.sh --output dist --arch arm64
-
-      # Tier 1. Everything below is conditioned on the certificate existing, so
-      # turning it on later is adding two secrets rather than rewriting this
-      # file. Until then the release is ad-hoc signed and the README says so.
-      - name: import the Developer ID certificate
-        if: env.HAS_SIGNING_CERTIFICATE == 'true'
+          export PLUME_VERSION="${PLUME_VERSION#v}"
+          ./scripts/release-signed.sh
+      - name: local ad-hoc artifacts (not notarized)
+        if: github.ref_type != 'tag'
         env:
-          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+          PLUME_VERSION: 0.0.0
         run: |
-          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security import /tmp/certificate.p12 -k build.keychain \
-            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: \
-            -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm -f /tmp/certificate.p12
-
-      - name: sign and notarize
-        if: env.HAS_SIGNING_CERTIFICATE == 'true'
-        env:
-          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
-          NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
-        run: |
-          codesign --force --options runtime --timestamp \
-            --entitlements packaging/plume.entitlements \
-            --sign "$SIGN_IDENTITY" dist/Plume.app
-          codesign --verify --strict --verbose=2 dist/Plume.app
-          ditto -c -k --sequesterRsrc --keepParent dist/Plume.app dist/notarize.zip
-          xcrun notarytool submit dist/notarize.zip \
-            --keychain-profile "$NOTARY_PROFILE" --wait
-          xcrun stapler staple dist/Plume.app
-          rm -f dist/notarize.zip
-
-      # zip via ditto rather than tar.gz, and the decisive reason is forward
-      # looking: xcrun notarytool accepts only .zip, .pkg and .dmg, so tar.gz
-      # would mean rewriting this step the day a Developer ID arrives.
-      # --sequesterRsrc preserves the extended attributes the signature seal
-      # lives in; --keepParent keeps Plume.app as the top-level entry rather
-      # than exploding Contents/ into the working directory.
-      - name: package
-        run: |
+          ./scripts/bundle.sh --output dist --arch arm64
+          ./scripts/dmg.sh --app dist/Plume.app --output dist
           cd dist
           ditto -c -k --sequesterRsrc --keepParent Plume.app plume-macos-arm64.zip
           shasum -a 256 plume-macos-arm64.zip > plume-macos-arm64.zip.sha256
-          ls -lh
-
-      - name: release
+          shasum -a 256 plume-macos-arm64.dmg > plume-macos-arm64.dmg.sha256
+      - name: publish
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.ref_type == 'tag'
         with:
           files: |
             dist/plume-macos-arm64.zip
             dist/plume-macos-arm64.zip.sha256
+            dist/plume-macos-arm64.dmg
+            dist/plume-macos-arm64.dmg.sha256
           generate_release_notes: true
           fail_on_unmatched_files: true
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}

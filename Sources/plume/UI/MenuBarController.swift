@@ -130,6 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private var stateTitle: String {
+        if let blocker = state.captureBlockerDescription { return blocker }
         switch state.dictation {
         case .idle:
             return "idle · hold \(state.hotkey.rawValue) or double-tap to lock"
@@ -155,7 +156,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if let failed = state.failedModel {
             return "model: \(state.model.id) · \(failed.id) failed"
         }
-        return "model: \(state.model.id)"
+        return "model: \(state.model.id) · \(state.preparation == .ready ? "loaded" : "not loaded")"
     }
 
     // MARK: - Submenus
@@ -164,7 +165,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let modelSubmenu = modelItem.submenu else { return }
         modelSubmenu.removeAllItems()
         for row in ModelCatalog.rows(
-            active: state.model,
+            active: state.preparation == .ready ? state.model : nil,
             pending: state.pendingModel,
             progress: state.switchProgress,
             failed: state.failedModel)
@@ -182,7 +183,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             case .active: item.state = .on
             case .installed, .available, .failed: item.state = .off
             }
-            item.isEnabled = row.isSelectable
+            item.isEnabled = row.isSelectable && state.preparation == .ready && state.dictation == .idle
             modelSubmenu.addItem(item)
         }
     }
