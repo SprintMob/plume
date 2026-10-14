@@ -1,6 +1,6 @@
 # Configurer la signature Apple et publier le DMG
 
-Status: in-progress
+Status: ready-for-human
 
 Le compte Apple Developer est actif. Le certificat Developer ID Application de
 SprintMob est créé, sa chaîne Apple G2 est reconnue par macOS et sa clé publique
@@ -11,6 +11,12 @@ v0.1.0 porte une signature ad hoc ; elle ne valide pas le parcours navigateur.
 Les artefacts 0.2.0 locaux sont maintenant signés Developer ID, notarizés et
 agrafés. Gatekeeper les accepte. La validation du téléchargement navigateur et
 de la première dictée sur un compte vierge précède encore la publication stable.
+
+Le candidat public est disponible :
+https://github.com/SprintMob/plume/releases/tag/installation-preview-0.2.0.
+Son téléchargement via Chrome conserve la quarantaine navigateur ; son SHA256,
+son ticket Apple et son acceptation Gatekeeper ont été vérifiés. Il reste la
+première installation/dictée sur un compte Mac vierge avant la release stable.
 
 ## Prérequis Apple à configurer de façon sécurisée
 
@@ -79,3 +85,10 @@ distribution livré avec l'implémentation pour leur configuration.
   l'app puis du DMG, acceptation Gatekeeper et SHA256 ZIP/DMG. Son trousseau et son
   répertoire de travail temporaires ont été retirés. Le candidat peut être publié
   pour les vérifications d'installation restantes ; le bouton stable reste désactivé.
+- Le candidat est publié avec DMG, ZIP et leurs checksums ; le tag de preview
+  n'active pas le workflow de tags stables v*. La PR brouillon est
+  https://github.com/SprintMob/plume/pull/1. Les deux jobs CI de build, tests et
+  bundle sont réussis sur 38c717f. Le téléchargement du DMG public dans Chrome a
+  été vérifié : quarantaine présente, SHA256 identique, signature/ticket valides,
+  Gatekeeper Notarized Developer ID. La demande utilisateur de validation de
+  première dictée sur compte vierge reste en attente ; ne pas présumer sa réussite.
